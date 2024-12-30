@@ -1,3 +1,46 @@
+## Setup tailscale VPN node with Radxa Zero3E
+
+### Compile OpenWRT
+- Install essential packages from https://openwrt.org/docs/guide-developer/toolchain/install-buildsystem
+
+```
+sudo apt install apt-file bsdutils build-essential curl device-tree-compiler diffutils fdutils findutils gawk git-gui grep gzip libncurses-dev libpython3-dev python3-pyelftools python3-setuptools swig tailscale vim
+
+```
+
+- Execute config.sh script to setup device config
+```
+bash config.sh
+make -j$(nproc) V=1
+```
+- Flash `./bin/targets/rockchip/armv8/openwrt-rockchip-armv8-radxa_zero-3e-ext4-sysupgrade.img.gz` to an SD-Card
+- Insert SD card and Ethernet cable in Radxa-Zero3E 
+- Insert Ethernet cable in router
+- Power Radxa-Zero3E with closest USB-C port to SD-Card
+
+- Wait for device to boot
+
+- Find connected devices in your router GUI or use an IP scanner
+- Type ip address in your browser
+- Set a "secure" password
+- On the GUI, navigate to Services > Terminal
+- Use username: `root` and same "secure" password that you set before
+- Run following command,
+```
+ash /run_me.sh
+tailscale login
+# click the link, login to tailscale
+tailscale up --advertise-exit-node
+reboot
+```
+- Login to tailscale console in your browser
+- Find the "Openwrt" device, in the side, click 3 dots,
+- Edit machine name, use a sensible name that you can recognize
+- Edit route settings, check "Use as exit node"
+- Disable Key Expiry
+- Share the device by link or by email, enable "Allow use as exit node"
+
+
 ![OpenWrt logo](include/logo.png)
 
 OpenWrt Project is a Linux operating system targeting embedded devices. Instead
