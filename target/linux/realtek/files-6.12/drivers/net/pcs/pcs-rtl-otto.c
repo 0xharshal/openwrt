@@ -50,6 +50,15 @@
 #define RTPCS_931X_MAC_LINK_STS			0x0ec0
 #define RTPCS_931X_MAC_RX_PAUSE_STS		0x0f00
 #define RTPCS_931X_MAC_TX_PAUSE_STS		0x0ef8
+#define RTPCS_931X_MAC_L2_PORT_CTRL		(0x6000)
+
+#define RTPCS_SDS_POLL_INTERVAL			(1 * HZ)
+
+#define RTPCS_931X_ASDS_PAGE(page) (page)
+#define RTPCS_931X_XSGMSDS_PAGE(page) (page + 0x40)
+#define RTPCS_931X_XSGMSDS1_PAGE(page) (page + 0x80)
+#define RTPCS_931X_DSDS_PAGE(page) (RTPCS_931X_XSGMSDS_PAGE(page))
+
 
 #define RTPCS_93XX_MAC_LINK_SPD_BITS		4
 
@@ -94,36 +103,72 @@
 #define RTL931X_SERDES_MODE_CTRL		(0x13cc)
 #define RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR	(0x13F4)
 #define RTL931X_MAC_SERDES_MODE_CTRL(sds)	(0x136C + (((sds) << 2)))
+#define RTL931X_FIB_UNIDIR_CTRL			(0x13c4)
 
-struct rtpcs_ctrl {
-	struct device *dev;
-	struct regmap *map;
-	struct mii_bus *bus;
-	const struct rtpcs_config *cfg;
-	struct rtpcs_link *link[RTPCS_PORT_CNT];
-	bool rx_pol_inv[RTPCS_SDS_CNT];
-	bool tx_pol_inv[RTPCS_SDS_CNT];
-	struct mutex lock;
+#define RTL931X_MAC_FORCE_MODE_CTRL_BASE	(0x0dcc)
+// #define RTL931X_MAC_FORCE_MODE_CTRL(port)	(0x0dcc + (((port) << 2)))
+
+#define RTL931X_PER_PORT_MAC_DEBUG0_BASE	(0x601c)
+// #define RTL931X_PER_PORT_MAC_DEBUG0(port)	(0x601c + (((port) << 2)))
+
+#define RTL931X_ISR_SERDES_RXIDLE		(0x12f8)
+#define RTL931X_SERDES_BC_CTRL			(0x5640)
+#define RTL931X_FRC_RXDV_H			(0xf4c)
+#define RTL931X_FRC_RXDV_L			(0xf50)
+
+#if 0
+// drv_rtl9310_sds2XsgmSds_get
+static inline int rtpcs_931x_sds2xsgmii_sds(uint32 sds)
+{
+	if (sds < 2) return sds;
+	return (sds - 1) * 2
+}
+
+static int rtpcs_931x_get_analog_sds(int sds)
+{
+	int map[] = {0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23};
+	int back = map[sds];
+
+	return back;
+}
+#endif
+
+#define RTL_MAX_FIELDS		(30)
+
+enum rtpcs_931x_regfield {
+	RTL931X_SMI_FORCE_LINK,
+	RTL931X_SMI_FORCE_LINK_EN,
+	RTL931X_SMI_SPD_SEL,
+	RTL931X_SMI_FORCE_SPD_EN,
+
+	RTL931X_TX_NO_PKT,
+	RTL931X_RX_NO_PKT,
+
+	RTL931X_MAC_L2_PORT_TX_EN,
+	RTL931X_MAC_L2_PORT_RX_EN,
+
+	// RTL931X_FIB_UNIDIR,
+
+	// RTL931X_SERDES_BC_EN,
+	// RTL931X_SERDES_BC_ID,
+
+	RTL931X_MAX_FIELDS
 };
 
-struct rtpcs_link {
-	struct rtpcs_ctrl *ctrl;
-	struct phylink_pcs pcs;
-	int sds;
-	int port;
-};
+const struct reg_field rtpcs_931x_reg_fields[RTL931X_MAX_FIELDS] = {
+	[RTL931X_SMI_FORCE_LINK] = REG_FIELD_ID(RTL931X_MAC_FORCE_MODE_CTRL_BASE, 9, 9, 56, 4),
+	[RTL931X_SMI_FORCE_LINK_EN] = REG_FIELD_ID(RTL931X_MAC_FORCE_MODE_CTRL_BASE, 0, 0, 56, 4),
+	[RTL931X_SMI_SPD_SEL] = REG_FIELD_ID(RTL931X_MAC_FORCE_MODE_CTRL_BASE, 12, 16, 56, 4),
+	[RTL931X_SMI_FORCE_SPD_EN] = REG_FIELD_ID(RTL931X_MAC_FORCE_MODE_CTRL_BASE, 3, 3, 56, 4),
 
-struct rtpcs_config {
-	int cpu_port;
-	int mac_link_dup_sts;
-	int mac_link_spd_bits;
-	int mac_link_spd_sts;
-	int mac_link_sts;
-	int mac_rx_pause_sts;
-	int mac_tx_pause_sts;
-	const struct phylink_pcs_ops *pcs_ops;
-	int (*set_autoneg)(struct rtpcs_ctrl *ctrl, int sds, unsigned int neg_mode);
-	int (*setup_serdes)(struct rtpcs_ctrl *ctrl, int sds, phy_interface_t mode);
+	[RTL931X_TX_NO_PKT] = REG_FIELD_ID(RTL931X_PER_PORT_MAC_DEBUG0_BASE, 28, 28, 56, 4),
+	[RTL931X_RX_NO_PKT] = REG_FIELD_ID(RTL931X_PER_PORT_MAC_DEBUG0_BASE, 29, 29, 56, 4),
+
+	[RTL931X_MAC_L2_PORT_TX_EN] = REG_FIELD_ID(RTPCS_931X_MAC_L2_PORT_CTRL, 1, 1, 56, 0x80),
+	[RTL931X_MAC_L2_PORT_RX_EN] = REG_FIELD_ID(RTPCS_931X_MAC_L2_PORT_CTRL, 0, 0, 56, 0x80),
+
+	// [RTL931X_FIB_UNIDIR] = REG_FIELD_ID(RTL931X_FIB_UNIDIR_CTRL, 0, 0, 56, 0),
+	// [RTL931X_SERDES_BC_EN] = REG_FIELD_ID(RTL931X_)
 };
 
 enum rtpcs_sds_mode {
@@ -148,18 +193,114 @@ enum rtpcs_sds_mode {
 	RTPCS_SDS_MODE_USXGMII_5GDXGMII,
 	RTPCS_SDS_MODE_USXGMII_2_5GSXGMII,
 };
+/*
+enum rtpcs_sds_10g_fiber_mode {
+	RTPCS_10GMEDIA_NONE = 0,
+
+	RTPCS_10GMEDIA_FIBER_10G,
+	RTPCS_10GMEDIA_FIBER_1G,
+	RTPCS_10GMEDIA_FIBER_2_5G,
+	RTPCS_10GMEDIA_FIBER_100M,
+	RTPCS_10GMEDIA_DAC_50CM,
+	RTPCS_10GMEDIA_DAC_100CM,
+	RTPCS_10GMEDIA_DAC_300CM,
+	RTPCS_10GMEDIA_DAC_500CM,
+	RTPCS_10GMEDIA_END,
+};
+*/
+
+struct rtpcs_ctrl {
+	struct device *dev;
+	struct regmap *map;
+	struct regmap_field *rm_fields[RTL931X_MAX_FIELDS];
+	struct mii_bus *bus;
+	const struct rtpcs_config *cfg;
+	struct rtpcs_link *link[RTPCS_PORT_CNT];
+	bool rx_pol_inv[RTPCS_SDS_CNT];
+	bool tx_pol_inv[RTPCS_SDS_CNT];
+	struct mutex lock;
+	struct workqueue_struct *wq;
+	struct delayed_work link_check_work;
+};
+
+struct rtpcs_link_sts {
+	int sts;
+	int sts1;
+	int latch_sts;
+	int latch_sts1;
+};
+struct rtpcs_link {
+	struct rtpcs_ctrl *ctrl;
+	struct phylink_pcs pcs;
+	int sds;
+	int port;
+	enum rtpcs_sds_mode sds_mode;
+	struct rtpcs_link_sts link_sts;
+	bool is_rx_calibrated;
+};
+
+struct rtpcs_config {
+	int cpu_port;
+	int mac_link_dup_sts;
+	int mac_link_spd_bits;
+	int mac_link_spd_sts;
+	int mac_link_sts;
+	int mac_rx_pause_sts;
+	int mac_tx_pause_sts;
+	const struct phylink_pcs_ops *pcs_ops;
+	int (*set_autoneg)(struct rtpcs_ctrl *ctrl, int sds, unsigned int neg_mode);
+	int (*setup_serdes)(struct rtpcs_ctrl *ctrl, int sds, phy_interface_t mode);
+	int (*setup_pcs_serdes)(struct phylink_pcs *pcs, int sds, int port, phy_interface_t mode);
+	void (*init_link_check)(struct rtpcs_ctrl *ctrl);
+	const struct reg_field *reg_fields;
+	const int num_reg_fields;
+};
 
 enum rtpcs_sds_cmu_type {
 	RTPCS_SDS_CMU_NONE = 0,
 	RTPCS_SDS_CMU_LC,
 	RTPCS_SDS_CMU_RING,
 };
-
 typedef struct {
 	u8 page;
 	u8 reg;
 	u16 data;
 } sds_config;
+
+enum rtpcs_9310_dfe_type {
+	RTPCS_9310_DFE_VTH,
+	RTPCS_9310_DFE_TAP0,
+	RTPCS_9310_DFE_TAP1EVEN,
+	RTPCS_9310_DFE_TAP1ODD,
+	RTPCS_9310_DFE_TAP2EVEN,
+	RTPCS_9310_DFE_TAP2ODD,
+	RTPCS_9310_DFE_TAP3EVEN,
+	RTPCS_9310_DFE_TAP3ODD,
+	RTPCS_9310_DFE_TAP4EVEN,
+	RTPCS_9310_DFE_TAP4ODD,
+	RTPCS_9310_DFE_FGCAL_OFST,
+	RTPCS_9310_DFE_END,
+};
+
+#define RTPCS_SDS_SYMERR_ALL_MAX	2
+#define RTPCS_SDS_SYMERR_CHANNEL_MAX	8
+struct rtpcs_symerr {
+	u32 ch[RTPCS_SDS_SYMERR_CHANNEL_MAX];
+	// unused members
+	// u32 all[RTPCS_SDS_SYMERR_ALL_MAX];
+	// u32 latch_blk_lock;
+	// u32 latch_hiber;
+	// u32 ber;
+	// u32 blk_err;
+};
+
+struct rtpcs_9310_dfe {
+	u32 coef_num;
+	u32 end_bit, start_bit;
+	u32 sign_bit;
+	s32 val;
+	enum rtpcs_9310_dfe_type type;
+};
 
 static int rtpcs_sds_to_mmd(int sds_page, int sds_regnum)
 {
@@ -234,6 +375,27 @@ static int rtpcs_regmap_read_bits(struct rtpcs_ctrl *ctrl, int base, int bithigh
 
 	return value;
 }
+
+#if 0
+static int rtpcs_regmap_read_masked_bypassed(struct rtpcs_ctrl *ctrl, int reg, unsigned int mask)
+{
+	unsigned int low;
+	unsigned int high;
+	struct reg_field r_field = {0};
+	struct regmap_field *p_regmap_field = NULL;
+
+	if (mask == 0)
+		return -EINVAL;
+
+	low = __builtin_ctz(mask);
+	high = (sizeof(unsigned int) * 8 - 1) - __builtin_clz(mask);
+	r_field = REG_FIELD(reg, low, high);
+	p_regmap_field = devm_regmap_field_alloc(ctrl->dev, )
+	return FIELD_GET(mask, ctrl->map->reg_base + reg);
+free:
+	devm_regmap_field_free(ctrl->dev, )
+}
+#endif
 
 static struct rtpcs_link *rtpcs_phylink_pcs_to_link(struct phylink_pcs *pcs)
 {
@@ -1991,12 +2153,41 @@ static void rtpcs_931x_sds_reset(struct rtpcs_ctrl *ctrl, u32 sds)
 	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, o);
 }
 
+static void rtpcs_931x_sds_10gr_symErr_get(struct rtpcs_ctrl *ctrl,
+					   u32 sds,
+					   enum rtpcs_sds_mode mode,
+					   struct rtpcs_symerr *sym_err_info)
+{
+	switch (mode) {
+	case RTPCS_SDS_MODE_10GBASER:
+		// ch[0] =
+		sym_err_info->ch[0] = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x5), 1, 7, 0);
+		break;
+	case RTPCS_SDS_MODE_1000BASEX:
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(0x1), 24, 2, 0, 0x0);
+		// v=
+		sym_err_info->ch[0] = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(0x1), 3, 15, 8);
+		// ch[0] = (v << 16) | v2=
+		sym_err_info->ch[0] <<= 16;
+		sym_err_info->ch[0] |= rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(0x1), 2, 15, 0);
+
+		// clear symerr
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(0x1), 3, 15, 8, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(0x1), 2, 15, 8, 0x0);
+		break;
+	default:
+		break;
+	}
+}
+
 static void rtpcs_931x_sds_symerr_clear(struct rtpcs_ctrl *ctrl, u32 sds,
 					enum rtpcs_sds_mode mode)
 {
-
+	struct rtpcs_symerr info = {0};
 	switch (mode) {
 	case RTPCS_SDS_MODE_XSGMII:
+	case RTPCS_SDS_MODE_HISGMII:
+	case RTPCS_SDS_MODE_SGMII:
 		for (int i = 0; i < 4; ++i) {
 			rtpcs_sds_write_bits(ctrl, sds, 0x41, 24,  2, 0, i);
 			rtpcs_sds_write_bits(ctrl, sds, 0x41,  3, 15, 8, 0x0);
@@ -2015,6 +2206,7 @@ static void rtpcs_931x_sds_symerr_clear(struct rtpcs_ctrl *ctrl, u32 sds,
 		rtpcs_sds_write_bits(ctrl, sds, 0x81, 1, 15, 8, 0x0);
 		break;
 	default:
+		rtpcs_931x_sds_10gr_symErr_get(ctrl, sds, mode, &info);
 		break;
 	}
 
@@ -2256,6 +2448,7 @@ static int rtpcs_931x_sds_fiber_disable(struct rtpcs_ctrl *ctrl, u32 sds)
 	return rtpcs_931x_sds_fiber_set_mode(ctrl, sds, RTPCS_SDS_MODE_OFF);
 }
 
+__attribute__((unused))
 static int rtpcs_931x_sds_get_cmu_band(struct rtpcs_ctrl *ctrl, int sds,
 				       enum rtpcs_sds_mode mode)
 {
@@ -2295,26 +2488,34 @@ static int rtpcs_931x_sds_set_cmu_band(struct rtpcs_ctrl *ctrl, int sds,
 	return 0;
 }
 
-__attribute__((unused))
-static int rtpcs_931x_sds_link_sts_get(struct rtpcs_ctrl *ctrl, u32 sds)
+// __attribute__((unused))
+static struct rtpcs_link_sts rtpcs_931x_sds_link_sts_get(struct rtpcs_ctrl *ctrl, u32 sds, enum rtpcs_sds_mode sds_mode)
 {
-	u32 sts, sts1, latch_sts, latch_sts1;
-	if (0){
-		sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 29, 8, 0);
-		sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 29, 8, 0);
-		latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 30, 8, 0);
-		latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 30, 8, 0);
-	} else {
-		sts = rtpcs_sds_read_bits(ctrl, sds, 0x5, 0, 12, 12);
-		latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x4, 1, 2, 2);
-		latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
-		sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
+	struct rtpcs_link_sts link_sts;
+	switch(sds_mode) {
+	case RTPCS_SDS_MODE_XSGMII:
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 29, 8, 0);
+		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 29, 8, 0);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 30, 8, 0);
+		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 30, 8, 0);
+		break;
+	case RTPCS_SDS_MODE_HISGMII:
+	case RTPCS_SDS_MODE_SGMII:
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 29, 8, 0);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 30, 8, 0);
+		break;
+	default:
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x5, 0, 12, 12);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x4, 1, 2, 2);
+		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
+		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
+		break;
 	}
 
 	pr_info("%s: serdes %d sts %d, sts1 %d, latch_sts %d, latch_sts1 %d\n", __func__,
-		sds, sts, sts1, latch_sts, latch_sts1);
+		sds, link_sts.sts, link_sts.sts1, link_sts.latch_sts, link_sts.latch_sts1);
 
-	return sts1;
+	return link_sts;
 }
 
 static int rtpcs_931x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
@@ -2340,7 +2541,119 @@ static int rtpcs_931x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
 	return rtpcs_sds_write_bits(ctrl, sds, 0x80, 0x0, 9, 8, val);
 }
 
-static sds_config sds_config_10p3125g_type1[] = {
+static sds_config rtpcs_931x_sds_cfg_ana_common[] = {
+	{ 0x21, 0x00, 0x1800 }, { 0x21, 0x01, 0x0060 }, { 0x21, 0x02, 0x3000 },
+	{ 0x21, 0x03, 0xFFFF }, { 0x21, 0x04, 0x0603 }, { 0x21, 0x05, 0x1104 },
+	{ 0x21, 0x06, 0x4444 }, { 0x21, 0x07, 0x7044 },	{ 0x21, 0x08, 0xF104 },
+	{ 0x21, 0x09, 0xF104 }, { 0x21, 0x0A, 0xF104 }, { 0x21, 0x0B, 0x0003 },
+	{ 0x21, 0x0C, 0x007F }, { 0x21, 0x0D, 0x3FE4 }, { 0x21, 0x0E, 0x31F9 },
+	{ 0x21, 0x0F, 0x0618 }, { 0x21, 0x10, 0x1FF8 }, { 0x21, 0x11, 0x7C9F },
+	{ 0x21, 0x12, 0x7C9F }, { 0x21, 0x13, 0x13FF }, { 0x21, 0x14, 0x001F },
+	{ 0x21, 0x15, 0x01F0 }, { 0x21, 0x16, 0x1067 }, { 0x21, 0x17, 0x8AF1 },
+	{ 0x21, 0x18, 0x210A }, { 0x21, 0x19, 0xF0F0 }
+};
+
+static sds_config rtpcs_931x_sds_cfg_10p3125g[] = {
+	{ 0x2E, 0x00, 0x0107 }, { 0x2E, 0x01, 0x0200 }, { 0x2E, 0x02, 0x6A24 },
+	{ 0x2E, 0x03, 0xD10D }, { 0x2E, 0x04, 0xD550 }, { 0x2E, 0x05, 0xA95E },
+	{ 0x2E, 0x06, 0xE31D }, { 0x2E, 0x07, 0x000E }, { 0x2E, 0x08, 0x0294 },
+	{ 0x2E, 0x09, 0x0CE4 }, { 0x2E, 0x0a, 0x7FC8 }, { 0x2E, 0x0b, 0xE0E7 },
+	{ 0x2E, 0x0c, 0x0200 }, { 0x2E, 0x0d, 0xDF80 }, { 0x2E, 0x0e, 0x0000 },
+	{ 0x2E, 0x0f, 0x1FC4 }, { 0x2E, 0x10, 0x0C3F }, { 0x2E, 0x11, 0x0000 },
+	{ 0x2E, 0x12, 0x27C0 }, { 0x2E, 0x13, 0x7F1C }, { 0x2E, 0x14, 0x1300 },
+	{ 0x2E, 0x15, 0x003F }, { 0x2E, 0x16, 0xBE7F }, { 0x2E, 0x17, 0x0090 },
+	{ 0x2E, 0x18, 0x0000 }, { 0x2E, 0x19, 0x4000 }, { 0x2E, 0x1a, 0x0000 },
+	{ 0x2E, 0x1b, 0x8000 }, { 0x2E, 0x1c, 0x011E }, { 0x2E, 0x1d, 0x0000 },
+	{ 0x2E, 0x1e, 0xC8FF }, { 0x2E, 0x1f, 0x0000 }, { 0x2F, 0x00, 0xC000 },
+	{ 0x2F, 0x01, 0xF000 }, { 0x2F, 0x02, 0x6010 }, { 0x2F, 0x12, 0x0EEE },
+	{ 0x2F, 0x13, 0x0000 }, { 0x06, 0x00, 0x0000 }
+};
+
+static sds_config rtpcs_931x_sds_cfg_10p3125g_cmu[] = {
+	{ 0x2F, 0x03, 0x4210 }, { 0x2F, 0x04, 0x0000 }, { 0x2F, 0x05, 0x3FD9 },
+	{ 0x2F, 0x06, 0x58A6 }, { 0x2F, 0x07, 0x2990 }, { 0x2F, 0x08, 0xFFF4 },
+	{ 0x2F, 0x09, 0x1F08 }, { 0x2F, 0x0A, 0x0000 }, { 0x2F, 0x0B, 0x8000 },
+	{ 0x2F, 0x0C, 0x4224 }, { 0x2F, 0x0D, 0x0000 }, { 0x2F, 0x0E, 0x0400 },
+	{ 0x2F, 0x0F, 0xA464 }, { 0x2F, 0x10, 0x8000 }, { 0x2F, 0x11, 0x0165 },
+	{ 0x20, 0x11, 0x000D }, { 0x20, 0x12, 0x510F }, { 0x20, 0x00, 0x0030 }
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana_2p5g[] = {
+	{0x26, 0x00, 0x0104}, {0x26, 0x01, 0x0200}, {0x26, 0x02, 0x2A24},
+	{0x26, 0x03, 0xD10D}, {0x26, 0x04, 0xD550}, {0x26, 0x05, 0xA95E},
+	{0x26, 0x06, 0xE31D}, {0x26, 0x07, 0x000E}, {0x26, 0x08, 0x0294},
+	{0x26, 0x09, 0x04E4}, {0x26, 0x0A, 0x7FC8}, {0x26, 0x0B, 0xE0E7},
+	{0x26, 0x0C, 0x0200}, {0x26, 0x0D, 0xDF80}, {0x26, 0x0E, 0x0800},
+	{0x26, 0x0F, 0x1FD8}, {0x26, 0x10, 0x0C3F}, {0x26, 0x11, 0x0000},
+	{0x26, 0x12, 0x27C0}, {0x26, 0x13, 0x7F1C}, {0x26, 0x14, 0x1300},
+	{0x26, 0x15, 0x003F}, {0x26, 0x16, 0xBE7F}, {0x26, 0x17, 0x0090},
+	{0x26, 0x18, 0x0000}, {0x26, 0x19, 0x407F}, {0x26, 0x1A, 0x0000},
+	{0x26, 0x1B, 0x8000}, {0x26, 0x1C, 0x011E}, {0x26, 0x1D, 0x0000},
+	{0x26, 0x1E, 0xC8FF}, {0x26, 0x1F, 0x0000}, {0x27, 0x00, 0xC000},
+	{0x27, 0x01, 0xF000}, {0x27, 0x02, 0x6010}, {0x27, 0x03, 0x6410},
+	{0x27, 0x05, 0x27D9}, {0x27, 0x07, 0x2990}, {0x27, 0x08, 0xFFF4},
+	{0x27, 0x09, 0x3082}, {0x27, 0x0C, 0x6424}, {0x27, 0x11, 0x037B},
+	{0x27, 0x12, 0x0EEE}, {0x27, 0x13, 0x0000}
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana_1p25g[] =
+{
+	{0x24, 0x00, 0x0104}, {0x24, 0x01, 0x0200}, {0x24, 0x02, 0x2A24},
+	{0x24, 0x03, 0xD10D}, {0x24, 0x04, 0xD550}, {0x24, 0x05, 0xA95E},
+	{0x24, 0x06, 0xE31D}, {0x24, 0x07, 0x800E}, {0x24, 0x08, 0x0294},
+	{0x24, 0x09, 0x04E4}, {0x24, 0x0A, 0x7FC8}, {0x24, 0x0B, 0xE0E7},
+	{0x24, 0x0C, 0x0200}, {0x24, 0x0D, 0x9F80}, {0x24, 0x0E, 0x0000},
+	{0x24, 0x0F, 0x1FF0}, {0x24, 0x10, 0x0C3F}, {0x24, 0x11, 0x0000},
+	{0x24, 0x12, 0x27C0}, {0x24, 0x13, 0x7F1C}, {0x24, 0x14, 0x1300},
+	{0x24, 0x15, 0x003F}, {0x24, 0x16, 0xBE7F}, {0x24, 0x17, 0x0090},
+	{0x24, 0x18, 0x0000}, {0x24, 0x19, 0x407F}, {0x24, 0x1A, 0x0000},
+	{0x24, 0x1B, 0x8000}, {0x24, 0x1C, 0x011E}, {0x24, 0x1D, 0x0000},
+	{0x24, 0x1E, 0xC8FF}, {0x24, 0x1F, 0x0000}, {0x25, 0x00, 0xC000},
+	{0x25, 0x01, 0xF000}, {0x25, 0x02, 0x6010}, {0x25, 0x12, 0x0EEE},
+	{0x25, 0x13, 0x0000}
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana2[] = {
+	{0x20, 0x12, 0x150F},
+	{0x2E, 0x7 , 0x800E},
+	{0x2A, 0x7 , 0x800E},
+	{0x24, 0x7 , 0x000E},
+	{0x26, 0x7 , 0x000E},
+	{0x28, 0x7 , 0x000E},
+
+	{0x2F, 0x12, 0x0AAA},
+
+	{0x2A, 0x12, 0x2740},
+	{0x2B, 0x0 , 0x0   },
+	{0x2B, 0x2 , 0x2010},
+
+	{0x2F, 0x3 , 0x84A0},
+	{0x2F, 0xC , 0x84A4},
+
+	{0x24, 0xD , 0xDF80},
+	{0x2A, 0xD , 0xDF80},
+
+	{0x2F, 0x5 , 0x2FD9},
+	{0x2F, 0x5 , 0x3FD9},
+	{0x21, 0x16, 0x1065},
+	{0x21, 0x16, 0x1067},
+
+	{0x21, 0x19, 0xF0A5},
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana_common_type1[] = {
+	{0x21, 0x00, 0x1800}, {0x21, 0x01, 0x0060}, {0x21, 0x02, 0x3000},
+	{0x21, 0x03, 0xFFFF}, {0x21, 0x04, 0x0603}, {0x21, 0x05, 0x1104},
+	{0x21, 0x06, 0x4444}, {0x21, 0x07, 0x7044}, {0x21, 0x08, 0xF104},
+	{0x21, 0x09, 0xF104}, {0x21, 0x0A, 0xF104}, {0x21, 0x0B, 0x0003},
+	{0x21, 0x0C, 0x007F}, {0x21, 0x0D, 0x3FE4}, {0x21, 0x0E, 0x31F9},
+	{0x21, 0x0F, 0x0618}, {0x21, 0x10, 0x1FF8}, {0x21, 0x11, 0x7C9F},
+	{0x21, 0x12, 0x7C9F}, {0x21, 0x13, 0x13FF}, {0x21, 0x14, 0x001F},
+	{0x21, 0x15, 0x01F0}, {0x21, 0x16, 0x1064}, {0x21, 0x17, 0x8AF1},
+	{0x21, 0x18, 0x210A}, {0x21, 0x19, 0xF0F1}
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana_10p3125g_type1[] = {
 	{ 0x2E, 0x00, 0x0107 }, { 0x2E, 0x01, 0x01A3 }, { 0x2E, 0x02, 0x6A24 },
 	{ 0x2E, 0x03, 0xD10D }, { 0x2E, 0x04, 0x8000 }, { 0x2E, 0x05, 0xA17E },
 	{ 0x2E, 0x06, 0xE31D }, { 0x2E, 0x07, 0x800E }, { 0x2E, 0x08, 0x0294 },
@@ -2356,7 +2669,7 @@ static sds_config sds_config_10p3125g_type1[] = {
 	{ 0x2F, 0x13, 0x0000 }
 };
 
-static sds_config sds_config_10p3125g_cmu_type1[] = {
+static sds_config rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1[] = {
 	{ 0x2F, 0x03, 0x4210 }, { 0x2F, 0x04, 0x0000 }, { 0x2F, 0x05, 0x0019 },
 	{ 0x2F, 0x06, 0x18A6 }, { 0x2F, 0x07, 0x2990 }, { 0x2F, 0x08, 0xFFF4 },
 	{ 0x2F, 0x09, 0x1F08 }, { 0x2F, 0x0A, 0x0000 }, { 0x2F, 0x0B, 0x8000 },
@@ -2364,15 +2677,522 @@ static sds_config sds_config_10p3125g_cmu_type1[] = {
 	{ 0x2F, 0x0F, 0xA470 }, { 0x2F, 0x10, 0x8000 }, { 0x2F, 0x11, 0x037B }
 };
 
-static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
-				       enum rtpcs_sds_mode mode)
+static sds_config rtpcs_931x_sds_cfg_ana_2p5g_type1[] = {
+	{0x26, 0x00, 0xF904}, {0x26, 0x01, 0x0200}, {0x26, 0x02, 0x2A20},
+	{0x26, 0x03, 0xD10D}, {0x26, 0x04, 0x8000}, {0x26, 0x05, 0xA17E},
+	{0x26, 0x06, 0xE115}, {0x26, 0x07, 0x000E}, {0x26, 0x08, 0x0294},
+	{0x26, 0x09, 0x04E4}, {0x26, 0x0A, 0x7FC8}, {0x26, 0x0B, 0xE0E7},
+	{0x26, 0x0C, 0x0200}, {0x26, 0x0D, 0xDF80}, {0x26, 0x0E, 0x0000},
+	{0x26, 0x0F, 0x1FE0}, {0x26, 0x10, 0x0C3F}, {0x26, 0x11, 0x0000},
+	{0x26, 0x12, 0x27C0}, {0x26, 0x13, 0x7E1D}, {0x26, 0x14, 0x1300},
+	{0x26, 0x15, 0x003F}, {0x26, 0x16, 0xBE7F}, {0x26, 0x17, 0x0090},
+	{0x26, 0x18, 0x0000}, {0x26, 0x19, 0x407F}, {0x26, 0x1A, 0x0000},
+	{0x26, 0x1B, 0x8000}, {0x26, 0x1C, 0x011E}, {0x26, 0x1D, 0x0000},
+	{0x26, 0x1E, 0xC8FF}, {0x26, 0x1F, 0x0000}, {0x27, 0x00, 0xC000},
+	{0x27, 0x01, 0xF000}, {0x27, 0x02, 0x6010}, {0x27, 0x12, 0x0EE7},
+	{0x27, 0x13, 0x0000}
+};
+
+static sds_config rtpcs_931x_sds_cfg_ana_1p25g_type1[] = {
+	{0x24, 0x00, 0xF904}, {0x24, 0x01, 0x0200}, {0x24, 0x02, 0x2A20},
+	{0x24, 0x03, 0xD10D}, {0x24, 0x04, 0x8000}, {0x24, 0x05, 0xA17E},
+	{0x24, 0x06, 0xE115}, {0x24, 0x07, 0x000E}, {0x24, 0x08, 0x0294},
+	{0x24, 0x09, 0x84E4}, {0x24, 0x0A, 0x7FC8}, {0x24, 0x0B, 0xE0E7},
+	{0x24, 0x0C, 0x0200}, {0x24, 0x0D, 0xDF80}, {0x24, 0x0E, 0x0000},
+	{0x24, 0x0F, 0x1FF0}, {0x24, 0x10, 0x0C3F}, {0x24, 0x11, 0x0000},
+	{0x24, 0x12, 0x27C0}, {0x24, 0x13, 0x7E1D}, {0x24, 0x14, 0x1300},
+	{0x24, 0x15, 0x003F}, {0x24, 0x16, 0xBE7F}, {0x24, 0x17, 0x0090},
+	{0x24, 0x18, 0x0000}, {0x24, 0x19, 0x407F}, {0x24, 0x1A, 0x0000},
+	{0x24, 0x1B, 0x8000}, {0x24, 0x1C, 0x011E}, {0x24, 0x1D, 0x0000},
+	{0x24, 0x1E, 0xC8FF}, {0x24, 0x1F, 0x0000}, {0x25, 0x00, 0xC000},
+	{0x25, 0x01, 0xF000}, {0x25, 0x02, 0x6010}, {0x25, 0x12, 0x0EE7},
+	{0x25, 0x13, 0x0000}
+};
+
+
+static void rtpcs_931x_init_leq_dfe(struct rtpcs_ctrl *ctrl, int sds)
+{
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 6, 0, 0x0);
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 7, 7, 0x1);
+
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 5, 0, 0x1e);
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 11, 0, 0x00);
+
+	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 12, 6, 0x7f);
+	rtpcs_sds_write(ctrl, sds, 0x2f, 0x12, 0xaaa);
+}
+
+static int rtpcs_931x_sds_config_usxgmii(struct rtpcs_ctrl *ctrl, int sds, int chiptype)
 {
 	u32 even_sds = sds & ~1;
+	u32 op_code, am_period;
+
+	if (chiptype) {
+		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 12, 12, 1);
+
+		for (int i = 0; i < sizeof(rtpcs_931x_sds_cfg_ana_10p3125g_type1) / sizeof(sds_config); ++i) {
+			rtpcs_sds_write(ctrl, sds,
+					rtpcs_931x_sds_cfg_ana_10p3125g_type1[i].page - 0x4,
+					rtpcs_931x_sds_cfg_ana_10p3125g_type1[i].reg,
+					rtpcs_931x_sds_cfg_ana_10p3125g_type1[i].data);
+
+		}
+
+		for (int i = 0; i < sizeof(rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1) / sizeof(sds_config); ++i) {
+			rtpcs_sds_write(ctrl, even_sds,
+					rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1[i].page - 0x4,
+					rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1[i].reg,
+					rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1[i].data);
+		}
+
+		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 12, 12, 0);
+	} else {
+		rtpcs_931x_init_leq_dfe(ctrl, sds);
+		rtpcs_931x_sds_rx_reset(ctrl, sds);
+
+
+		// TODO: Consider rtl8224qf phy
+
+		// Only implement default switch case
+		op_code = 0xAA;
+		am_period = 0x5078;
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x1d, 0x0600);
+
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x13, 0x0000);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x14, 0x0000);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x15, 0x0000);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x16, 0x0000);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x17, 0x0000);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x18, 0x0000);
+
+		// end of switch-case
+		rtpcs_sds_write_bits(ctrl, sds, 0x7, 0x10, 15, 8, 0x60);
+		rtpcs_sds_write_bits(ctrl, sds, 0x7, 0x10, 7, 0, op_code);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0x12, am_period);
+		rtpcs_sds_write(ctrl, sds, 0x7, 0x6, 0x1401);
+		rtpcs_sds_write(ctrl, sds, 0x7, 0x8, 0x1401);
+		rtpcs_sds_write(ctrl, sds, 0x7, 0xa, 0x1401);
+		rtpcs_sds_write(ctrl, sds, 0x7, 0xc, 0x1401);
+		rtpcs_sds_write(ctrl, sds, 0x6, 0xe, 0x055a);
+		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x3, 15, 15, 1);
+	}
+	return 0;
+}
+
+#if 1
+static uint64_t rtpcs_931x_port_fib_unidir_set(struct rtpcs_ctrl *ctrl, int port, bool is_unidir)
+{
+	u32 val[2] = {0};
+	u64 unidir_sts, val64;
+
+	regmap_bulk_read(ctrl->map, RTL931X_FIB_UNIDIR_CTRL, &val[0], 2);
+
+	unidir_sts = ((u64)val[1] << 32) | (val[0]);
+	val64 = unidir_sts & (is_unidir ? ~BIT_ULL(port) : BIT_ULL(port));
+	val[1] = val64 >> 32;
+	val[0] = (u32)((u64)val64 & 0xffffffff);
+	regmap_bulk_write(ctrl->map, RTL931X_FIB_UNIDIR_CTRL, &val64, sizeof(unidir_sts));
+
+	return unidir_sts;
+}
+#else
+static int rtpcs_931x_port_fib_unidir_set(struct rtpcs_ctrl *ctrl, int port, bool is_unidir)
+{
+	u32 unidir_sts_port;
+	u32 val[2];
+
+	regmap_bulk_read(ctrl->map, RTL931X_FIB_UNIDIR_CTRL, &val[0], sizeof(u64));
+	pr_err("[hh CC] %s: val[0]:0x%x val[1]:0x%x\n", __func__, val[0], val[1]);
+	regmap_fields_read(ctrl->rm_fields[RTL931X_FIB_UNIDIR], port, &unidir_sts_port);
+	regmap_fields_write(ctrl->rm_fields[RTL931X_FIB_UNIDIR], port, is_unidir ? 0 : 1);
+	pr_err("[hh CC] %s: Completed\n", __func__);
+	return unidir_sts_port;
+}
+#endif
+
+// _phy_rtl9310_linkDown_chk
+static int rtpcs_931x_link_down_chk(struct rtpcs_ctrl *ctrl, int port)
+{
+	u32 dbg_sts = 0, sts_cnt = 0, chk_cnt = 0;
+	u64 unidir_sts = rtpcs_931x_port_fib_unidir_set(ctrl, port, 0);
+	int ret;
+
+	/* If serdes returns no packet for 3 consecutive times, link down successful */
+	/* TODO: Can this be implemented using regmap_field_read_poll_timeout? */
+	while (sts_cnt != 3 && chk_cnt < 0xFFFF) {
+		// We don't want cached values while polling for change
+		regmap_fields_read(ctrl->rm_fields[RTL931X_TX_NO_PKT], port, &dbg_sts);
+		if (dbg_sts)
+			sts_cnt++;
+		else
+			sts_cnt = 0;
+
+		chk_cnt++;
+	}
+
+	if (sts_cnt != 3) {
+		ret = -1;
+		goto out;
+	}
+
+	ret = 0;
+out:
+	// restore previous value
+	#if 1
+	rtpcs_931x_port_fib_unidir_set(ctrl, port, !!(unidir_sts & BIT_ULL(port)));
+	#else
+	rtpcs_931x_port_fib_unidir_set(ctrl, port, unidir_sts);
+	#endif
+	return ret;
+}
+
+
+// _drv_rtl9310_portMacForceLink_oper
+// drv_rtl9310_portMacForceLink_set
+static void rtpcs_931x_port_mac_force_link_set(struct rtpcs_ctrl *ctrl, int port, bool is_enabled, bool linksts)
+{
+	if (is_enabled) {
+		regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_LINK],
+			port,
+			linksts ? BIT(9) : 0);
+	}
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_LINK_EN],
+			    port,
+			    is_enabled ? 1 : 0);
+}
+
+// _phy_rtl9310_sds_init
+static int rtpcs_931x_phy_sds_init(struct rtpcs_link *link)
+{
+	struct rtpcs_ctrl *ctrl = link->ctrl;
+	rtpcs_931x_port_mac_force_link_set(ctrl, link->port, true, false);
+	link->is_rx_calibrated = false;
+	rtpcs_931x_link_down_chk(ctrl, link->port);
+	rtpcs_sds_write_bits(ctrl, link->sds, 0x2e, 0xe, 13, 11, 0);
+	rtpcs_931x_init_leq_dfe(ctrl, link->sds);
+	return 0;
+}
+
+// _phy_rtl9310_linkDown_process
+static void rtpcs_931x_sds_linkdown_process(struct rtpcs_link *link)
+{
+	regmap_write_bits(link->ctrl->map,
+			  RTL931X_ISR_SERDES_RXIDLE,
+			  BIT(link->sds - 2),
+			  BIT(link->sds - 2));
+	rtpcs_931x_phy_sds_init(link);
+}
+
+// _phy_rtl9310_dfe_set
+static void rtpcs_9310_sds_dfe_set(struct rtpcs_ctrl *ctrl,
+				   u32 sds,
+				   enum rtpcs_9310_dfe_type dfe_type,
+				   int val)
+{
+	switch(dfe_type) {
+	case RTPCS_9310_DFE_VTH:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x12, 11, 4, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 12, 12, 1);
+		break;
+	case RTPCS_9310_DFE_TAP0:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 5, 5, 0);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 4, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 6, 6, 1);
+		break;
+	case RTPCS_9310_DFE_TAP1EVEN:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 7, 7, 1);
+		break;
+	case RTPCS_9310_DFE_TAP1ODD:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 7, 7, 1);
+		break;
+	case RTPCS_9310_DFE_TAP2EVEN:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 8, 8, 1);
+		break;
+	case RTPCS_9310_DFE_TAP2ODD:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 8, 8, 1);
+		break;
+	case RTPCS_9310_DFE_TAP3EVEN:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 9, 9, 1);
+		break;
+	case RTPCS_9310_DFE_TAP3ODD:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 9, 9, 1);
+		break;
+	case RTPCS_9310_DFE_TAP4EVEN:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 10, 10, 1);
+		break;
+	case RTPCS_9310_DFE_TAP4ODD:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 10, 10, 1);
+		break;
+	case RTPCS_9310_DFE_FGCAL_OFST:
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x19, 14, 7, val);
+		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x19, 6, 6, 1);
+		break;
+	case RTPCS_9310_DFE_END:
+		break;
+	}
+}
+
+// _phy_rtl9310_fiber_adapt
+static void rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
+{
+	struct rtpcs_9310_dfe sds_dfe[] = {
+		{0x0f, 7, 0, 32, 0, RTPCS_9310_DFE_END},
+		{0x00, 5, 0, 5, 0, RTPCS_9310_DFE_TAP0},
+		{0x0c, 7, 0, 32, 0, RTPCS_9310_DFE_VTH},
+	};
+
+	#if 0
+	struct rtpcs_9310_dfe sds_dfe2[] = {
+		{0x01, 5, 0, 5, 0, RTPCS_9310_DFE_TAP1EVEN},
+		{0x06, 5, 0, 5, 0, RTPCS_9310_DFE_TAP1ODD},
+		{0x02, 5, 0, 5, 0, RTPCS_9310_DFE_TAP2EVEN},
+		{0x07, 5, 0, 5, 0, RTPCS_9310_DFE_TAP2ODD},
+		{0x03, 5, 0, 5, 0, RTPCS_9310_DFE_TAP3EVEN},
+		{0x08, 5, 0, 5, 0, RTPCS_9310_DFE_TAP3ODD},
+		{0x04, 5, 0, 5, 0, RTPCS_9310_DFE_TAP4EVEN},
+		{0x09, 5, 0, 5, 0, RTPCS_9310_DFE_TAP4ODD},
+	};
+	#endif
+
+	struct rtpcs_symerr info = {0};
+
+	if (link->sds < 2)
+		return;
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xc, 14, 10, 0);
+	pr_info("%s: SDS %d Calibration...\n", __func__, link->sds);
+	rtpcs_931x_init_leq_dfe(link->ctrl, link->sds);
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 6, 6, 0);
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 12, 12, 0);
+	mdelay(200);
+	// TODO _phy_rtl9310_dbg_set
+
+	for (int i = 0; i < ARRAY_SIZE(sds_dfe); i++) {
+		if (sds_dfe[i].type != RTPCS_9310_DFE_END) {
+			if (sds_dfe[i].type == RTPCS_9310_DFE_TAP0)
+				sds_dfe[i].val = 31;
+			rtpcs_9310_sds_dfe_set(link->ctrl,
+					       link->sds,
+					       sds_dfe[i].type,
+					       sds_dfe[i].val);
+		}
+	}
+
+	rtpcs_931x_sds_reset(link->ctrl, link->sds);
+
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 7, 7, 0);
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 8, 8, 0);
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 9, 9, 0);
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 10, 10, 0);
+
+	// TODO Handle manual DFE config
+
+	for (int i = 0; i < 3; i++) {
+		rtpcs_931x_sds_symerr_clear(link->ctrl, link->sds, link->sds_mode);
+		mdelay(150);
+		rtpcs_931x_sds_10gr_symErr_get(link->ctrl, link->sds, link->sds_mode, &info);
+		if (info.ch[0] == 0)
+			break;
+	}
+	// TODO does it make sense to return errors here?
+
+}
+
+// _phy_rtl9310_rxCali
+static void rtpcs_931x_sds_rxcali(struct rtpcs_link *link)
+{
+	u32 ori_off_mode;
+	mdelay(50);
+	// drv_port_txEnable_set
+	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_TX_EN], link->port, 0);
+	// drv_port_rxEnable_set
+	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_RX_EN], link->port, 0);
+	regmap_read(link->ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, &ori_off_mode);
+	regmap_write_bits(link->ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, BIT(link->sds), BIT(link->sds));
+	// if any non-serdes port
+	// TODO _phy_rtl9310_leq_adapt
+	// else if serdes port
+	if (link->sds_mode == RTPCS_SDS_MODE_10GBASER) {
+		rtpcs_sds_write_bits(link->ctrl, link->sds, 0x2e, 0xe, 13, 11, 1);
+		rtpcs_931x_sds_fiber_adapt(link);
+	}
+
+	link->is_rx_calibrated = true;
+	regmap_write(link->ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, ori_off_mode);
+	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_TX_EN], link->port, 1);
+	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_RX_EN], link->port, 1);
+
+}
+
+// _phy_rtl9310_linkUp_process
+static void rtpcs_931x_sds_linkup_process(struct rtpcs_link *link)
+{
+	if (!link->is_rx_calibrated) {
+		rtpcs_931x_sds_rxcali(link);
+	}
+	// TODO _phy_rtl9310_linkUp_post_chk
+	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_DSDS_PAGE(31), 1, 0, 0, 0x0);
+	// TODO dal_mango_stack_linkUp_handler_pre
+	rtpcs_931x_port_mac_force_link_set(link->ctrl, link->port, false, true);
+	// TODO dal_mango_stack_linkUp_handler_post
+
+}
+
+/*
+// phy_rtl9310_dac_chk
+static void rtpcs_931x_dac_chk(struct rtpcs_link *link)
+{
+	switch (link->sds_mode) {
+
+	}
+}
+*/
+
+// TODO phy_rtl9310_sdsFiberRx_check
+/**
+ * Returns 0 if fiber_rx is okay
+ *
+ */
+static int rtpcs_931x_sds_fiber_rx_check(struct rtpcs_link *link)
+{
+	struct rtpcs_ctrl *ctrl = link->ctrl;
+	struct rtpcs_symerr symerr_info = {0};
+	int check_err_count;
+
+	switch (link->sds_mode) {
+	case RTPCS_SDS_MODE_10GBASER:
+	case RTPCS_SDS_MODE_1000BASEX:
+	case RTPCS_SDS_MODE_2500BASEX:
+		break;
+	default:
+		return 0;
+	}
+
+	link->link_sts = rtpcs_931x_sds_link_sts_get(ctrl, link->sds, link->sds_mode);
+	if (link->link_sts.sts == 0 &&
+	    link->link_sts.sts1 == 0) {
+		if (link->is_rx_calibrated) {
+			rtpcs_931x_sds_linkdown_process(link);
+		}
+		return -1;
+		/*
+		else {
+			// TODO _phy_rtl9310_dac_chk
+		}
+		*/
+	}
+
+	if (!link->is_rx_calibrated) {
+		rtpcs_931x_sds_linkup_process(link);
+
+	}
+
+	if (link->is_rx_calibrated) {
+		for (int i = 0; i < 3; i++) {
+			rtpcs_931x_sds_10gr_symErr_get(link->ctrl,
+						       link->sds,
+						       link->sds_mode,
+						       &symerr_info);
+			if (symerr_info.ch[0] != 0)
+				check_err_count++;
+
+		}
+		if (check_err_count >= 2) {
+			pr_err("Fiber RX check: Error in fiber connection.\n");
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+//TODO dal_phy_fiberRx_watchdog
+static void rtpcs_931x_poll_link_check(struct work_struct *work)
+{
+	struct rtpcs_ctrl *ctrl = container_of(to_delayed_work(work),
+					       struct rtpcs_ctrl,
+					       link_check_work);
+	int ret;
+
+	for (int port = 0; port < ctrl->cfg->cpu_port; port++) {
+		if (!ctrl->link[port])
+			continue;
+		ret = rtpcs_931x_sds_fiber_rx_check(ctrl->link[port]);
+		if (ret != 0) {
+			// phy_serdesFiberRx_reset
+			rtpcs_931x_sds_linkdown_process(ctrl->link[port]);
+			rtpcs_931x_sds_linkup_process(ctrl->link[port]);
+		}
+		// TODO phy_fiberRx_check
+		// TODO phy_fiberRx_reset
+
+		// TODO phy_media_get
+	}
+
+	queue_delayed_work(ctrl->wq,
+			   &ctrl->link_check_work,
+			   RTPCS_SDS_POLL_INTERVAL);
+}
+
+static void rtpcs_931x_init_link_check(struct rtpcs_ctrl *ctrl)
+{
+	pr_err("[hh CC] %s: Work queue init\n", __func__);
+	// struct rtpcs_link *link = rtpcs_phylink_pcs_to_link(pcs);
+	INIT_DELAYED_WORK(&ctrl->link_check_work, rtpcs_931x_poll_link_check);
+	queue_delayed_work(ctrl->wq,
+			   &ctrl->link_check_work,
+			   RTPCS_SDS_POLL_INTERVAL);
+}
+
+
+static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
+				       int port, enum rtpcs_sds_mode mode)
+{
+	u32 even_sds = sds & ~1;
+	u64 unidir_sts;
+	u32 spd_en_ori, spd_ori, ps_sds_sts;
+	// , val;
+	// u64 val64;
+
+	// u32 xsgmii_sds = rtpcs_931x_sds2xsgmii_sds(sds);
+	// u32 analog_sds = rtpcs_931x_get_analog_sds(sds);
 
 	/* from _phy_rtl9310_10gMedia_set */
+	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: calling fib_unidir_set\n");
+	unidir_sts = rtpcs_931x_port_fib_unidir_set(ctrl, port, 0);
+
+	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: before port_mac_force_link_set\n");
+	rtpcs_931x_port_mac_force_link_set(ctrl, port, true, false);
+	// (void)rtpcs_931x_port_mac_force_link_set;
+	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: after port_mac_force_link_set\n");
+	// ignore return value, this part is not crucial
+	rtpcs_931x_link_down_chk(ctrl, port);
+	regmap_fields_read(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, &spd_ori);
+	regmap_fields_read(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, &spd_en_ori);
+
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, 0);
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, 1);
+
+	regmap_read(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, &ps_sds_sts);
+	// val = ps_sds_sts | BIT(sds);
+	regmap_write_bits(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, BIT(sds), BIT(sds));
+
 
 	/* gating of ? */
-	rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(31), 0x1, 0, 0, 0x1);
+
+	rtpcs_931x_init_leq_dfe(ctrl, sds);
+
 
 	/* media none behaviour */
 	rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x2740);
@@ -2384,20 +3204,31 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 	rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x12, 7, 6, 0x1);
 	rtpcs_931x_sds_fiber_disable(ctrl, sds);
 
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, spd_ori);
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, spd_en_ori);
+	pr_err("[hh CC] %s: %d I reach here.\n", __func__, __LINE__);
+	#if 1
+	rtpcs_931x_port_fib_unidir_set(ctrl, port, !!(unidir_sts & BIT_ULL(port)));
+	#else
+	rtpcs_931x_port_fib_unidir_set(ctrl, port, unidir_sts);
+	#endif
 	rtpcs_sds_write(ctrl, even_sds, 0x2e, 0x8, 0x294);
 
 	switch (mode) {
 	case RTPCS_SDS_MODE_10GBASER:
 		/* from _dal_mango_construct_init_10gr */
-		rtpcs_sds_write_bits(ctrl, sds, 0x1f, 0xb, 1, 1, 1);
+		// rtpcs_sds_write_bits(ctrl, sds, 0x1f, 0xb, 1, 1, 1);
 
 		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x0);
 		rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x7, 15, 15, 0x1);
 		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
 
+		// phy_rtl9310_10g_tx
+
 		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 5, 0, 0x2);
 		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0xd, 6, 6, 0x1);
 
+		rtpcs_931x_sds_set_mode(ctrl, sds, mode);
 		/* from _phy_rtl9310_10gMedia_set */
 		rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x27c0);
 		rtpcs_sds_write(ctrl, sds, 0x2f, 0x0, 0xc000);
@@ -2415,11 +3246,15 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 
 		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0xd, 6, 6, 0x1);
 
+		rtpcs_931x_sds_set_mode(ctrl, sds, mode);
+
 		/* from _dal_mango_construct_init_fiber1g */
 		rtpcs_sds_write_bits(ctrl, sds, 0x43, 0x13, 15, 14, 0x0);
+
 		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 12, 12, 0x1);
 		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 6, 6, 0x1);
 		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 13, 13, 0x0);
+
 		rtpcs_sds_write_bits(ctrl, sds, 0x40, 0x4, 2, 2, 0x1);
 
 		/* gating of ? */
@@ -2436,12 +3271,196 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x1);
 	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
 
+	regmap_write_bits(ctrl->map, RTL931X_ISR_SERDES_RXIDLE, BIT(sds - 2), BIT(sds - 2));
+	rtpcs_931x_sds_reset(ctrl, sds);
+	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, ps_sds_sts);
+
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, 1);
+	mdelay(50);
+	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, spd_en_ori);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_DSDS_PAGE(31), 1, 0, 0, 0x0);
+
 	return 0;
 }
 
-static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
+static inline void rtpcs_931x_sds_patch(struct rtpcs_ctrl *ctrl,
+				   int sds,
+				   sds_config *config,
+				   size_t patch_len)
+{
+	while(patch_len) {
+		rtpcs_sds_write(ctrl, sds, config->page, config->reg, config->data);
+		config++;
+		patch_len--;
+	}
+}
+
+static int rtpcs_931x_sds_init(struct rtpcs_ctrl *ctrl, int sds, int chiptype)
+{
+	unsigned int val;
+	regmap_write(ctrl->map, RTL931X_SERDES_BC_CTRL, 0x1f);
+	regmap_write(ctrl->map, RTL931X_FRC_RXDV_H, 0xffffffff);
+	regmap_write(ctrl->map, RTL931X_FRC_RXDV_L, 0xffffffff);
+
+	// begin _dal_mango_construct_10g_sds_ana_patch
+	if (chiptype) {
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_common_type1,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_common_type1));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_10p3125g_type1,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_10p3125g_type1));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1));
+		// patch ana_5g_type1
+		// patch ana_5g_cmu_type1
+		// patch ana_3p125g_type1
+		// patch ana_3p125g_cmu_type1
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_2p5g_type1,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_2p5g_type1));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_1p25g_type1,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_1p25g_type1));
+	} else {
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_common,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_common));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_10p3125g,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_10p3125g));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_10p3125g_cmu,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_10p3125g_cmu));
+		// patch 5g
+		// patch 5g_cmu
+		// patch 3p125g
+		// patch 3p125g_cmu
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_2p5g,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_2p5g));
+		rtpcs_931x_sds_patch(ctrl,
+					sds,
+					rtpcs_931x_sds_cfg_ana_1p25g,
+					ARRAY_SIZE(rtpcs_931x_sds_cfg_ana_1p25g));
+		val = 0xa0000;
+		regmap_write(ctrl->map, RTL93XX_CHIP_INFO, val);
+		regmap_read(ctrl->map, RTL93XX_CHIP_INFO, &val);
+		if (val & BIT(28)) {
+			rtpcs_931x_sds_patch(ctrl,
+						sds,
+						rtpcs_931x_sds_cfg_ana2,
+						ARRAY_SIZE(rtpcs_931x_sds_cfg_ana2));
+		}
+		regmap_write(ctrl->map, RTL93XX_CHIP_INFO, 0);
+		// Lots of unexplained specific serdes register writes for chiptype 0.
+		// are handled here separately.
+
+		switch(sds) {
+		case 2:
+			rtpcs_sds_write_bits(ctrl, 2, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, 0x29, 0x6, 15, 0, 0x5826);
+			break;
+		case 6:
+			rtpcs_sds_write_bits(ctrl, 6, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x2f, 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 6, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x2d, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x2b, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x25, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x27, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, 0x29, 0x5, 15, 0, 0x27D7);
+			break;
+		case 10:
+			rtpcs_sds_write_bits(ctrl, 10, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x2f, 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 10, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x2d, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x2b, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x25, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x27, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, 0x29, 0x5, 15, 0, 0x27D7);
+			break;
+		case 14:
+			rtpcs_sds_write_bits(ctrl, 14, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x2f, 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 14, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x2d, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x2b, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x25, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x27, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, 0x29, 0x5, 15, 0, 0x27D7);
+			break;
+		case 18:
+			rtpcs_sds_write_bits(ctrl, 18, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x2f, 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 18, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x2d, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x2b, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x25, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x27, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, 0x29, 0x5, 15, 0, 0x27D7);
+			break;
+		case 22:
+			rtpcs_sds_write_bits(ctrl, 22, 0x2f, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x2f, 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 22, 0x2d, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x2d, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, 0x2b, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x2b, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, 0x25, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x25, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, 0x27, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x27, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, 0x29, 0x5, 15, 0, 0x27D7);
+			break;
+		default:
+			break;
+		}
+	}
+	// end _dal_mango_construct_10g_sds_ana_patch
+	return 0;
+}
+
+
+static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int port,
 				   phy_interface_t mode)
 {
+	struct rtpcs_link *link = rtpcs_phylink_pcs_to_link(pcs);
+	struct rtpcs_ctrl *ctrl = link->ctrl;
+
+
 	u32 board_sds_tx_type1[] = {
 		0x01c3, 0x01c3, 0x01c3, 0x01a3, 0x01a3, 0x01a3,
 		0x0143, 0x0143, 0x0143, 0x0143, 0x0163, 0x0163,
@@ -2454,8 +3473,8 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 		0x0dc0, 0x01c0, 0x0200, 0x0180, 0x0160, 0x0123,
 		0x0123, 0x0163, 0x01a3, 0x01a0, 0x01c3, 0x09c3,
 	};
-	u32 band, ori, model_info, val;
-	enum rtpcs_sds_mode sds_mode;
+	u32 ori, model_info, val;
+	// enum rtpcs_sds_mode sds_mode;
 	int chiptype = 0;
 	u32 even_sds;
 
@@ -2471,8 +3490,8 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 	 *
 	 * For now disable all USXGMII SerDes handling and rely on U-Boot setup.
 	 */
-	if (mode == PHY_INTERFACE_MODE_USXGMII)
-		return 0;
+	// if (mode == PHY_INTERFACE_MODE_USXGMII)
+		// return 0;
 
 	even_sds = sds & ~1;
 
@@ -2502,82 +3521,44 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 
 	pr_info("%s: 2.5gbit %08X", __func__,
 	        rtpcs_sds_read(ctrl, sds, 0x41, 0x14));
+	rtpcs_931x_sds_init(ctrl, sds, chiptype);
+
+	// Begin _dal_mango_construct_sdsMode_set
 
 	regmap_read(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, &ori);
 	pr_info("%s: RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, ori);
 	val = ori | (1 << sds);
 	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, val);
 
-	band = rtpcs_931x_sds_get_cmu_band(ctrl, sds, sds_mode);
+	// band = rtpcs_931x_sds_get_cmu_band(ctrl, sds, link->sds_mode);
 
 	switch (mode) {
 	case PHY_INTERFACE_MODE_NA:
 		goto out;
 
 	case PHY_INTERFACE_MODE_USXGMII: /* MII_USXGMII_10GSXGMII/10GDXGMII/10GQXGMII: */
-		u32 op_code = 0x6003;
-
 		/* TODO: implement that the other USXGMII submodes are supported too */
-		sds_mode = RTPCS_SDS_MODE_USXGMII_10GSXGMII;
-
-		if (chiptype) {
-			rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 12, 12, 1);
-
-			for (int i = 0; i < sizeof(sds_config_10p3125g_type1) / sizeof(sds_config); ++i) {
-				rtpcs_sds_write(ctrl, sds,
-						sds_config_10p3125g_type1[i].page - 0x4,
-						sds_config_10p3125g_type1[i].reg,
-						sds_config_10p3125g_type1[i].data);
-			}
-
-			for (int i = 0; i < sizeof(sds_config_10p3125g_cmu_type1) / sizeof(sds_config); ++i) {
-				rtpcs_sds_write(ctrl, even_sds,
-						sds_config_10p3125g_cmu_type1[i].page - 0x4,
-						sds_config_10p3125g_cmu_type1[i].reg,
-						sds_config_10p3125g_cmu_type1[i].data);
-			}
-
-			rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 12, 12, 0);
-		} else {
-
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 6, 0, 0x0);
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 7, 7, 0x1);
-
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 5, 0, 0x1E);
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 11, 0, 0x00);
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 11, 0, 0x00);
-			rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 11, 0, 0x00);
-			rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 11, 0, 0x00);
-
-			rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 12, 6, 0x7F);
-			rtpcs_sds_write(ctrl, sds, 0x2f, 0x12, 0xaaa);
-
-			rtpcs_931x_sds_rx_reset(ctrl, sds);
-
-			rtpcs_sds_write(ctrl, sds, 0x7, 0x10, op_code);
-			rtpcs_sds_write(ctrl, sds, 0x6, 0x1d, 0x0480);
-			rtpcs_sds_write(ctrl, sds, 0x6, 0xe, 0x0400);
-		}
-
+		link->sds_mode = RTPCS_SDS_MODE_USXGMII_10GSXGMII;
+		rtpcs_931x_sds_config_usxgmii(ctrl, sds, chiptype);
 		break;
 
 	case PHY_INTERFACE_MODE_10GBASER:
-		sds_mode = RTPCS_SDS_MODE_10GBASER;
-		rtpcs_931x_sds_config_fiber(ctrl, sds, sds_mode);
+		link->sds_mode = RTPCS_SDS_MODE_10GBASER;
+		rtpcs_931x_sds_config_fiber(ctrl, sds, port, link->sds_mode);
 		break;
 
 	case PHY_INTERFACE_MODE_2500BASEX:
-		sds_mode = RTPCS_SDS_MODE_2500BASEX;
-		rtpcs_931x_sds_config_fiber(ctrl, sds, sds_mode);
+		link->sds_mode = RTPCS_SDS_MODE_2500BASEX;
+		rtpcs_931x_sds_config_fiber(ctrl, sds, port, link->sds_mode);
 		break;
 
 	case PHY_INTERFACE_MODE_1000BASEX:
-		sds_mode = RTPCS_SDS_MODE_1000BASEX;
-		rtpcs_931x_sds_config_fiber(ctrl, sds, sds_mode);
+		link->sds_mode = RTPCS_SDS_MODE_1000BASEX;
+		rtpcs_931x_sds_config_fiber(ctrl, sds, port, link->sds_mode);
 		break;
 
 	case PHY_INTERFACE_MODE_SGMII:
-		sds_mode = RTPCS_SDS_MODE_SGMII;
+		link->sds_mode = RTPCS_SDS_MODE_SGMII;
 
 		/* gating of ? */
 		rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x1);
@@ -2585,7 +3566,7 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 		rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x0);
 
 		rtpcs_931x_sds_set_cmu_band(ctrl, sds, true, 62,
-					    RTPCS_SDS_MODE_SGMII);
+					    link->sds_mode);
 
 		break;
 
@@ -2596,7 +3577,7 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 		return -ENOTSUPP;
 	}
 
-	rtpcs_931x_sds_set_cmu_type(ctrl, sds, sds_mode, chiptype);
+	rtpcs_931x_sds_set_cmu_type(ctrl, sds, link->sds_mode, chiptype);
 
 	if (sds >= 2 && sds <= 13) {
 		if (chiptype)
@@ -2616,9 +3597,24 @@ static int rtpcs_931x_setup_serdes(struct rtpcs_ctrl *ctrl, int sds,
 		}
 	}
 
+	val = ori & ~(1 << sds);
+	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, val);
+	/* TODO: This does not belong here.
 	rtpcs_931x_sds_set_polarity(ctrl, sds, ctrl->tx_pol_inv[sds],
 				    ctrl->rx_pol_inv[sds]);
-	rtpcs_931x_sds_set_mode(ctrl, sds, sds_mode);
+					*/
+	(void)rtpcs_931x_sds_set_polarity;
+	rtpcs_931x_sds_set_mode(ctrl, sds, link->sds_mode);
+
+	// end: _dal_mango_construct_sdsMode_set
+	mdelay(10);
+	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
+	mdelay(1000);
+
+	// TODO: auto rx-calibration
+	// Rely on auto rx-calibration
+
 
 out:
 	val = ori & ~BIT(sds);
@@ -2637,6 +3633,7 @@ static void rtpcs_pcs_get_state(struct phylink_pcs *pcs, struct phylink_link_sta
 	struct rtpcs_ctrl *ctrl = link->ctrl;
 	int port = link->port;
 	int linkup, speed;
+
 
 	state->link = 0;
 	state->speed = SPEED_UNKNOWN;
@@ -2697,6 +3694,7 @@ static void rtpcs_pcs_an_restart(struct phylink_pcs *pcs)
 	struct rtpcs_link *link = rtpcs_phylink_pcs_to_link(pcs);
 	struct rtpcs_ctrl *ctrl = link->ctrl;
 
+
 	dev_warn(ctrl->dev, "an_restart() for port %d and sds %d not yet implemented\n",
 		 link->port, link->sds);
 }
@@ -2708,6 +3706,7 @@ static int rtpcs_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
 	struct rtpcs_link *link = rtpcs_phylink_pcs_to_link(pcs);
 	struct rtpcs_ctrl *ctrl = link->ctrl;
 	int ret = 0;
+	// int err = 0;
 
 	if (link->sds < 0)
 		return 0;
@@ -2725,6 +3724,11 @@ static int rtpcs_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
 
 	if (ctrl->cfg->setup_serdes) {
 		ret = ctrl->cfg->setup_serdes(ctrl, link->sds, interface);
+		if (ret < 0)
+			goto out;
+	// }
+	} else if (ctrl->cfg->setup_pcs_serdes) {
+		ret = ctrl->cfg->setup_pcs_serdes(pcs, link->sds, link->port, interface);
 		if (ret < 0)
 			goto out;
 	}
@@ -2748,6 +3752,8 @@ struct phylink_pcs *rtpcs_create(struct device *dev, struct device_node *np, int
 	struct device_node *pcs_np;
 	struct rtpcs_ctrl *ctrl;
 	struct rtpcs_link *link;
+	// char queue_name[256] = "";
+	// int err;
 	int sds;
 
 	/*
@@ -2787,6 +3793,8 @@ struct phylink_pcs *rtpcs_create(struct device *dev, struct device_node *np, int
 		return ERR_PTR(-EPROBE_DEFER);
 	}
 
+	// snprintf(queue_name, sizeof(queue_name), "pcs-rtl-otto");
+
 	if (port < 0 || port > ctrl->cfg->cpu_port)
 		return ERR_PTR(-EINVAL);
 
@@ -2819,6 +3827,7 @@ static struct mii_bus *rtpcs_probe_serdes_bus(struct rtpcs_ctrl *ctrl)
 {
 	struct device_node *np;
 	struct mii_bus *bus;
+	int err;
 
 	np = of_find_compatible_node(NULL, NULL, "realtek,otto-serdes-mdio");
 	if (!np) {
@@ -2836,6 +3845,18 @@ static struct mii_bus *rtpcs_probe_serdes_bus(struct rtpcs_ctrl *ctrl)
 	if (!of_device_is_available(np)) {
 		dev_err(ctrl->dev, "SerDes mdio bus not usable");
 		return ERR_PTR(-ENODEV);
+	}
+
+	ctrl->wq = create_singlethread_workqueue("pcs-rtl-otto");
+	if (!ctrl->wq) {
+		dev_err(ctrl->dev,
+			"Error creating workqueue: %d\n",
+			err);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	if (ctrl->cfg->init_link_check) {
+		ctrl->cfg->init_link_check(ctrl);
 	}
 
 	return bus;
@@ -2862,6 +3883,35 @@ static int rtpcs_probe(struct platform_device *pdev)
 	if (IS_ERR(ctrl->map))
 		return PTR_ERR(ctrl->map);
 
+	if (ctrl->cfg->reg_fields) {
+		#if 1
+		// ctrl->rm_fields = devm_kzalloc(dev, ctrl->cfg->num_reg_fields * sizeof(struct regmap_field *), GFP_KERNEL);
+		pr_err("[hh CC] %s: ctrl->rm_fields: %px\n", __func__, ctrl->rm_fields);
+		for (int i = 0; i < ctrl->cfg->num_reg_fields; i++) {
+			ctrl->rm_fields[i] = devm_regmap_field_alloc(dev, ctrl->map, ctrl->cfg->reg_fields[i]);
+			if (IS_ERR(ctrl->rm_fields[i]))
+				return PTR_ERR(ctrl->rm_fields[i]);
+			pr_err("[hh CC] %s: ctrl->rm_fields[i:%d]: %px\n", __func__, i, ctrl->rm_fields[i]);
+		}
+		#else
+		if (devm_regmap_field_bulk_alloc(dev,
+						 ctrl->map,
+						 ctrl->rm_fields,
+						 ctrl->cfg->reg_fields,
+						 ctrl->cfg->num_reg_fields)) {
+			return -ENOMEM;
+		}
+		for (int i = 0; i < ctrl->cfg->num_reg_fields; i++) {
+			pr_err("[hh CC] %s: ctrl->rm_fields[i:%d]: %px\n", __func__, i, ctrl->rm_fields[i]);
+		}
+		#endif
+
+	}
+
+
+	// ctrl->map->cache_bypass = true;
+	// ctrl->map->cache_only = false;
+
 	ctrl->bus = rtpcs_probe_serdes_bus(ctrl);
 	if (IS_ERR(ctrl->bus))
 		return PTR_ERR(ctrl->bus);
@@ -2883,7 +3933,7 @@ static int rtpcs_probe(struct platform_device *pdev)
 	 */
 	platform_set_drvdata(pdev, ctrl);
 
-	dev_info(dev, "Realtek PCS driver initialized\n");
+	dev_warn(dev, "Realtek PCS driver initialized\n");
 
 	return 0;
 }
@@ -2965,7 +4015,10 @@ static const struct rtpcs_config rtpcs_931x_cfg = {
 	.mac_tx_pause_sts	= RTPCS_931X_MAC_TX_PAUSE_STS,
 	.pcs_ops		= &rtpcs_931x_pcs_ops,
 	.set_autoneg		= rtpcs_93xx_set_autoneg,
-	.setup_serdes		= rtpcs_931x_setup_serdes,
+	.setup_pcs_serdes	= rtpcs_931x_setup_pcs_serdes,
+	.init_link_check	= rtpcs_931x_init_link_check,
+	.reg_fields 		= rtpcs_931x_reg_fields,
+	.num_reg_fields		= RTL931X_MAX_FIELDS,
 };
 
 static const struct of_device_id rtpcs_of_match[] = {

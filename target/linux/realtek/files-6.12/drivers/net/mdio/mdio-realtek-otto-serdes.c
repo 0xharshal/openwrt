@@ -142,6 +142,80 @@ static int rtsds_dbg_registers_show(struct seq_file *seqf, void *unused)
 }
 DEFINE_SHOW_ATTRIBUTE(rtsds_dbg_registers);
 
+static inline int get_token(char **buffer, const char *delim, uint *data)
+{
+        char *token = NULL;
+        if (NULL == (token = strsep(buffer, ":"))) {
+                pr_err("Could not extract token from buffer\n");
+                return -1;
+        }
+        if (0 != kstrtouint(token, 0, data)) {
+                pr_err("Could not get uint from token: %s\n", token);
+                return -2;
+        }
+        return 0;
+}
+
+static ssize_t sds_write(struct file *filep,
+			 const char __user *buffer,
+			 size_t count,
+			 loff_t *ppos)
+{
+	struct rtsds_debug_info *dbg_info = file_inode(filep)->i_private;
+	struct rtsds_ctrl *ctrl = dbg_info->ctrl;
+	struct mii_bus *bus = ctrl->bus;
+	unsigned int sds, regnum, page, val;
+	int subpage;
+
+	char b[256] = {0};
+	char *bp = b;
+
+	if (copy_from_user(b, buffer, sizeof(b))) {
+		pr_err("Could not copy data from userspace.\n");
+		return count;
+	}
+
+	if (0 != get_token(&bp, ":", &sds)) {
+		pr_err("Could not get sds\n");
+		return count;
+	}
+
+	if (0 != get_token(&bp, ":", &page)) {
+		pr_err("Could not get page\n");
+		return count;
+	}
+
+	if (0 != get_token(&bp, ":", &regnum)) {
+		pr_err("Could not get reg\n");
+		return count;
+	}
+
+	pr_err("[hh CC] Back SDS %02d:", ctrl->cfg->get_backing_sds(ctrl, sds, page));
+
+	subpage = RTSDS_SUBPAGE(page);
+	val = mdiobus_c45_read(bus, sds, MDIO_MMD_VEND1,
+			       rtsds_sds_to_mmd(page, regnum));
+	pr_err("[hh CC] sds:%d, page:0x%x, subpage:0x%x, reg:0x%x, val:0x%x\n", sds, page, subpage, regnum, val);
+
+	if (0 != get_token(&bp, ":", &val)) {
+		return count;
+	}
+	pr_err("[hh CC] Going to write newval: 0x%x\n", val);
+
+	mdiobus_c45_write(bus, sds, MDIO_MMD_VEND1,
+			  rtsds_sds_to_mmd(page, regnum), val);
+	val = mdiobus_c45_read(bus, sds, MDIO_MMD_VEND1,
+			       rtsds_sds_to_mmd(page, regnum));
+	pr_err("[hh CC] sds:%d, page:0x%x, subpage:0x%x, reg:0x%x, newval:0x%x\n", sds, page, subpage, regnum, val);
+	return count;
+}
+
+static const struct file_operations sds_rw_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = sds_write,
+};
+
 static int rtsds_debug_init(struct rtsds_ctrl *ctrl, u32 sds)
 {
 	struct rtsds_debug_info *dbg_info;
@@ -163,6 +237,7 @@ static int rtsds_debug_init(struct rtsds_ctrl *ctrl, u32 sds)
 	dir = debugfs_create_dir(dirname, root);
 
 	debugfs_create_file("registers", 0600, dir, dbg_info, &rtsds_dbg_registers_fops);
+	debugfs_create_file("sds_rw", 0666, dir, dbg_info, &sds_rw_fops);
 
 	return 0;
 }
@@ -340,6 +415,8 @@ static int rtsds_930x_get_backing_sds(struct rtsds_ctrl *ctrl, int sds, int page
  * - "Odd" SerDes with numbers 3, 5, 7, 9, 11, 13 work on a total of 3 background SerDes (one
  *   analog and two digital)
  *
+ * anasds = backend serdes 1
+ * xsgmSds = backend serdes 2
  * This maps to:
  *
  * Frontend SerDes  |  0  1  2  3  4  5  6  7  8  9 10 11 12 13
@@ -360,6 +437,7 @@ static int rtsds_930x_get_backing_sds(struct rtsds_ctrl *ctrl, int sds, int page
  * page 0x40-0x7f (digi 1):	page 0x00-0x3f back SDS		page 0x00-0x3f back SDS+1
  * page 0x80-0xbf (digi 2):	page 0x00-0x3f back SDS+1	page 0x00-0x3f back SDS+2
  */
+
 static int rtsds_931x_get_backing_sds(struct rtsds_ctrl *ctrl, int sds, int page)
 {
 	int map[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
