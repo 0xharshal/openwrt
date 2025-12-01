@@ -212,7 +212,11 @@ enum rtpcs_sds_10g_fiber_mode {
 struct rtpcs_ctrl {
 	struct device *dev;
 	struct regmap *map;
+	#if 0
 	struct regmap_field *rm_fields[RTL931X_MAX_FIELDS];
+	#else
+	struct regmap_field **rm_fields;
+	#endif
 	struct mii_bus *bus;
 	const struct rtpcs_config *cfg;
 	struct rtpcs_link *link[RTPCS_PORT_CNT];
@@ -2189,21 +2193,21 @@ static void rtpcs_931x_sds_symerr_clear(struct rtpcs_ctrl *ctrl, u32 sds,
 	case RTPCS_SDS_MODE_HISGMII:
 	case RTPCS_SDS_MODE_SGMII:
 		for (int i = 0; i < 4; ++i) {
-			rtpcs_sds_write_bits(ctrl, sds, 0x41, 24,  2, 0, i);
-			rtpcs_sds_write_bits(ctrl, sds, 0x41,  3, 15, 8, 0x0);
-			rtpcs_sds_write_bits(ctrl, sds, 0x41,  2, 15, 0, 0x0);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 24,  2, 0, i);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1),  3, 15, 8, 0x0);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1),  2, 15, 0, 0x0);
 		}
 
 		for (int i = 0; i < 4; ++i) {
-			rtpcs_sds_write_bits(ctrl, sds, 0x81, 24,  2, 0, i);
-			rtpcs_sds_write_bits(ctrl, sds, 0x81,  3, 15, 8, 0x0);
-			rtpcs_sds_write_bits(ctrl, sds, 0x81,  2, 15, 0, 0x0);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1), 24,  2, 0, i);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1),  3, 15, 8, 0x0);
+			rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1),  2, 15, 0, 0x0);
 		}
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x41, 0, 15, 0, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x41, 1, 15, 8, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x81, 0, 15, 0, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x81, 1, 15, 8, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 0, 15, 0, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 1, 15, 8, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1), 0, 15, 0, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1), 1, 15, 8, 0x0);
 		break;
 	default:
 		rtpcs_931x_sds_10gr_symErr_get(ctrl, sds, mode, &info);
@@ -2301,21 +2305,21 @@ static int rtpcs_931x_sds_set_cmu_type(struct rtpcs_ctrl *ctrl, u32 sds,
 		if (chiptype)
 			rtpcs_sds_write_bits(ctrl, sds, cmu_page, 0xd, 14, 14, 0);
 
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 3, 2, 0x3);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, frc_lc_mode_bitnum, frc_lc_mode_bitnum, 0x1);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, frc_lc_mode_val_bitnum, frc_lc_mode_val_bitnum, 0x0);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 12, 12, 0x1);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 15, 13, frc_cmu_spd);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 3, 2, 0x3);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, frc_lc_mode_bitnum, frc_lc_mode_bitnum, 0x1);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, frc_lc_mode_val_bitnum, frc_lc_mode_val_bitnum, 0x0);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 12, 12, 0x1);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 15, 13, frc_cmu_spd);
 	} else if (cmu_type == RTPCS_SDS_CMU_LC) {
 		rtpcs_sds_write_bits(ctrl, sds, cmu_page, 0x7, 15, 15, 1);
 		if (chiptype)
 			rtpcs_sds_write_bits(ctrl, sds, cmu_page, 0xd, 14, 14, 1);
 
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 1, 0, 0x3);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, frc_lc_mode_bitnum, frc_lc_mode_bitnum, 0x1);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, frc_lc_mode_val_bitnum, frc_lc_mode_val_bitnum, 0x1);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 8, 8, 0x1);
-		rtpcs_sds_write_bits(ctrl, even_sds, 0x20, 0x12, 11, 9, frc_cmu_spd);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 1, 0, 0x3);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, frc_lc_mode_bitnum, frc_lc_mode_bitnum, 0x1);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, frc_lc_mode_val_bitnum, frc_lc_mode_val_bitnum, 0x1);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 8, 8, 0x1);
+		rtpcs_sds_write_bits(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x20), 0x12, 11, 9, frc_cmu_spd);
 	}
 
 	return 0;
@@ -2326,15 +2330,15 @@ static void rtpcs_931x_sds_rx_reset(struct rtpcs_ctrl *ctrl, u32 sds)
 	if (sds < 2)
 		return;
 
-	rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x2740);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x0, 0x0);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x2, 0x2010);
-	rtpcs_sds_write(ctrl, sds, 0x20, 0x0, 0xc10);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x12, 0x2740);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 0x0);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x2, 0x2010);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 0xc10);
 
-	rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x27c0);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x0, 0xc000);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x2, 0x6010);
-	rtpcs_sds_write(ctrl, sds, 0x20, 0x0, 0xc30);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x12, 0x27c0);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 0xc000);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x2, 0x6010);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 0xc30);
 
 	mdelay(50);
 }
@@ -2429,7 +2433,7 @@ static int rtpcs_931x_sds_fiber_set_mode(struct rtpcs_ctrl *ctrl, u32 sds,
 	}
 
 	pr_info("%s writing analog SerDes Mode value %02x\n", __func__, val);
-	rtpcs_sds_write_bits(ctrl, sds, 0x1f, 0x9, 11, 6, val);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x1f), 0x9, 11, 6, val);
 
 	return 0;
 }
@@ -2459,10 +2463,10 @@ static int rtpcs_931x_sds_get_cmu_band(struct rtpcs_ctrl *ctrl, int sds,
 	page = rtpcs_931x_sds_get_cmu_page(mode);
 	page += 1;
 
-	rtpcs_sds_write(ctrl, sds, 0x1f, 0x2, 73);
-	rtpcs_sds_write_bits(ctrl, sds, page, 0x5, 15, 15, 0x1);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x1f), 0x2, 73);
+	rtpcs_sds_write_bits(ctrl, sds, page, RTPCS_931X_ASDS_PAGE(0x5), 15, 15, 0x1);
 
-	band = rtpcs_sds_read_bits(ctrl, sds, 0x1f, 0x15, 8, 3);
+	band = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x1f), 0x15, 8, 3);
 	pr_info("%s: sds %u band is %u\n", __func__, sds, band);
 	return band;
 }
@@ -2479,10 +2483,10 @@ static int rtpcs_931x_sds_set_cmu_band(struct rtpcs_ctrl *ctrl, int sds,
 	page += 1;
 
 	en_val = enable ? 0 : 1;
-	rtpcs_sds_write_bits(ctrl, sds, page, 0x7, 13, 13, en_val);
-	rtpcs_sds_write_bits(ctrl, sds, page, 0x7, 11, 11, en_val);
+	rtpcs_sds_write_bits(ctrl, sds, page, RTPCS_931X_ASDS_PAGE(0x7), 13, 13, en_val);
+	rtpcs_sds_write_bits(ctrl, sds, page, RTPCS_931X_ASDS_PAGE(0x7), 11, 11, en_val);
 
-	rtpcs_sds_write_bits(ctrl, sds, page, 0x7, 4, 0, band);
+	rtpcs_sds_write_bits(ctrl, sds, page, RTPCS_931X_ASDS_PAGE(0x7), 4, 0, band);
 
 	rtpcs_931x_sds_reset(ctrl, sds);
 	return 0;
@@ -2494,21 +2498,21 @@ static struct rtpcs_link_sts rtpcs_931x_sds_link_sts_get(struct rtpcs_ctrl *ctrl
 	struct rtpcs_link_sts link_sts;
 	switch(sds_mode) {
 	case RTPCS_SDS_MODE_XSGMII:
-		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 29, 8, 0);
-		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 29, 8, 0);
-		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 30, 8, 0);
-		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x81, 30, 8, 0);
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 29, 8, 0);
+		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1), 29, 8, 0);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 30, 8, 0);
+		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x1), 30, 8, 0);
 		break;
 	case RTPCS_SDS_MODE_HISGMII:
 	case RTPCS_SDS_MODE_SGMII:
-		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 29, 8, 0);
-		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x41, 30, 8, 0);
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 29, 8, 0);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 30, 8, 0);
 		break;
 	default:
-		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, 0x5, 0, 12, 12);
-		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, 0x4, 1, 2, 2);
-		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
-		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, 0x42, 1, 2, 2);
+		link_sts.sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x5), 0, 12, 12);
+		link_sts.latch_sts = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x4), 1, 2, 2);
+		link_sts.latch_sts1 = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x2), 1, 2, 2);
+		link_sts.sts1 = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x2), 1, 2, 2);
 		break;
 	}
 
@@ -2528,17 +2532,17 @@ static int rtpcs_931x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
 
 	/* 10gr_*_inv */
 	val = (tx_val << 1) | rx_val;
-	ret = rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 14, 13, val);
+	ret = rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x2, 14, 13, val);
 	if (ret)
 		return ret;
 
 	/* xsg_*_inv */
 	val = (rx_val << 1) | tx_val;
-	ret = rtpcs_sds_write_bits(ctrl, sds, 0x40, 0x0, 9, 8, val);
+	ret = rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x0), 0x0, 9, 8, val);
 	if (ret)
 		return ret;
 
-	return rtpcs_sds_write_bits(ctrl, sds, 0x80, 0x0, 9, 8, val);
+	return rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x0), 0x0, 9, 8, val);
 }
 
 static sds_config rtpcs_931x_sds_cfg_ana_common[] = {
@@ -2712,17 +2716,17 @@ static sds_config rtpcs_931x_sds_cfg_ana_1p25g_type1[] = {
 
 static void rtpcs_931x_init_leq_dfe(struct rtpcs_ctrl *ctrl, int sds)
 {
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 6, 0, 0x0);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xd, 7, 7, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xd, 6, 0, 0x0);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xd, 7, 7, 0x1);
 
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 5, 0, 0x1e);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 11, 0, 0x00);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 11, 0, 0x00);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 11, 0, 0x00);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1c, 5, 0, 0x1e);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1d, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1f, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 11, 0, 0x00);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x1, 11, 0, 0x00);
 
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 12, 6, 0x7f);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x12, 0xaaa);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 12, 6, 0x7f);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x12, 0xaaa);
 }
 
 static int rtpcs_931x_sds_config_usxgmii(struct rtpcs_ctrl *ctrl, int sds, int chiptype)
@@ -2748,7 +2752,7 @@ static int rtpcs_931x_sds_config_usxgmii(struct rtpcs_ctrl *ctrl, int sds, int c
 					rtpcs_931x_sds_cfg_ana_10p3125g_cmu_type1[i].data);
 		}
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x2, 12, 12, 0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x2, 12, 12, 0);
 	} else {
 		rtpcs_931x_init_leq_dfe(ctrl, sds);
 		rtpcs_931x_sds_rx_reset(ctrl, sds);
@@ -2759,25 +2763,25 @@ static int rtpcs_931x_sds_config_usxgmii(struct rtpcs_ctrl *ctrl, int sds, int c
 		// Only implement default switch case
 		op_code = 0xAA;
 		am_period = 0x5078;
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x1d, 0x0600);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x1d, 0x0600);
 
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x13, 0x0000);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x14, 0x0000);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x15, 0x0000);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x16, 0x0000);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x17, 0x0000);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x18, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x13, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x14, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x15, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x16, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x17, 0x0000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x18, 0x0000);
 
 		// end of switch-case
-		rtpcs_sds_write_bits(ctrl, sds, 0x7, 0x10, 15, 8, 0x60);
-		rtpcs_sds_write_bits(ctrl, sds, 0x7, 0x10, 7, 0, op_code);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0x12, am_period);
-		rtpcs_sds_write(ctrl, sds, 0x7, 0x6, 0x1401);
-		rtpcs_sds_write(ctrl, sds, 0x7, 0x8, 0x1401);
-		rtpcs_sds_write(ctrl, sds, 0x7, 0xa, 0x1401);
-		rtpcs_sds_write(ctrl, sds, 0x7, 0xc, 0x1401);
-		rtpcs_sds_write(ctrl, sds, 0x6, 0xe, 0x055a);
-		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0x3, 15, 15, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0x10, 15, 8, 0x60);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0x10, 7, 0, op_code);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x12, am_period);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0x6, 0x1401);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0x8, 0x1401);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0xa, 0x1401);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x7), 0xc, 0x1401);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0xe, 0x055a);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0x3, 15, 15, 1);
 	}
 	return 0;
 }
@@ -2871,7 +2875,7 @@ static int rtpcs_931x_phy_sds_init(struct rtpcs_link *link)
 	rtpcs_931x_port_mac_force_link_set(ctrl, link->port, true, false);
 	link->is_rx_calibrated = false;
 	rtpcs_931x_link_down_chk(ctrl, link->port);
-	rtpcs_sds_write_bits(ctrl, link->sds, 0x2e, 0xe, 13, 11, 0);
+	rtpcs_sds_write_bits(ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xe, 13, 11, 0);
 	rtpcs_931x_init_leq_dfe(ctrl, link->sds);
 	return 0;
 }
@@ -2894,49 +2898,49 @@ static void rtpcs_9310_sds_dfe_set(struct rtpcs_ctrl *ctrl,
 {
 	switch(dfe_type) {
 	case RTPCS_9310_DFE_VTH:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x12, 11, 4, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 12, 12, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x12, 11, 4, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 12, 12, 1);
 		break;
 	case RTPCS_9310_DFE_TAP0:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 5, 5, 0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1c, 4, 0, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 6, 6, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1c, 5, 5, 0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1c, 4, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 6, 6, 1);
 		break;
 	case RTPCS_9310_DFE_TAP1EVEN:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 5, 0, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 7, 7, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1d, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 7, 7, 1);
 		break;
 	case RTPCS_9310_DFE_TAP1ODD:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1d, 11, 6, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 7, 7, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1d, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 7, 7, 1);
 		break;
 	case RTPCS_9310_DFE_TAP2EVEN:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 5, 0, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 8, 8, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1f, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 8, 8, 1);
 		break;
 	case RTPCS_9310_DFE_TAP2ODD:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x1f, 11, 6, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 8, 8, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1f, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 8, 8, 1);
 		break;
 	case RTPCS_9310_DFE_TAP3EVEN:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 5, 0, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 9, 9, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 9, 9, 1);
 		break;
 	case RTPCS_9310_DFE_TAP3ODD:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x0, 11, 6, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 9, 9, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 9, 9, 1);
 		break;
 	case RTPCS_9310_DFE_TAP4EVEN:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 5, 0, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 10, 10, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x1, 5, 0, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 10, 10, 1);
 		break;
 	case RTPCS_9310_DFE_TAP4ODD:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2f, 0x1, 11, 6, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 10, 10, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x1, 11, 6, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 10, 10, 1);
 		break;
 	case RTPCS_9310_DFE_FGCAL_OFST:
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x19, 14, 7, val);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0x19, 6, 6, 1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x19, 14, 7, val);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x19, 6, 6, 1);
 		break;
 	case RTPCS_9310_DFE_END:
 		break;
@@ -2944,7 +2948,7 @@ static void rtpcs_9310_sds_dfe_set(struct rtpcs_ctrl *ctrl,
 }
 
 // _phy_rtl9310_fiber_adapt
-static void rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
+static int rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
 {
 	struct rtpcs_9310_dfe sds_dfe[] = {
 		{0x0f, 7, 0, 32, 0, RTPCS_9310_DFE_END},
@@ -2968,7 +2972,7 @@ static void rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
 	struct rtpcs_symerr info = {0};
 
 	if (link->sds < 2)
-		return;
+		return 0;
 	rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xc, 14, 10, 0);
 	pr_info("%s: SDS %d Calibration...\n", __func__, link->sds);
 	rtpcs_931x_init_leq_dfe(link->ctrl, link->sds);
@@ -3004,8 +3008,10 @@ static void rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
 		if (info.ch[0] == 0)
 			break;
 	}
-	// TODO does it make sense to return errors here?
 
+	if (0 != info.ch[0])
+		return -1;
+	return 0;
 }
 
 // _phy_rtl9310_rxCali
@@ -3108,7 +3114,11 @@ static int rtpcs_931x_sds_fiber_rx_check(struct rtpcs_link *link)
 
 		}
 		if (check_err_count >= 2) {
-			pr_err("Fiber RX check: Error in fiber connection.\n");
+			dev_err(link->ctrl->dev,
+				"%s: Fiber RX check port:%d sds:%d: Error in fiber connection.\n",
+				__func__,
+				link->port,
+				link->sds);
 			return 1;
 		}
 	}
@@ -3117,6 +3127,7 @@ static int rtpcs_931x_sds_fiber_rx_check(struct rtpcs_link *link)
 }
 
 //TODO dal_phy_fiberRx_watchdog
+__attribute__((unused))
 static void rtpcs_931x_poll_link_check(struct work_struct *work)
 {
 	struct rtpcs_ctrl *ctrl = container_of(to_delayed_work(work),
@@ -3195,13 +3206,13 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 
 
 	/* media none behaviour */
-	rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x2740);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x0, 0x0);
-	rtpcs_sds_write(ctrl, sds, 0x2f, 0x2, 0x2010);
-	rtpcs_sds_write(ctrl, sds, 0x20, 0x0, 0xcd1);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 5, 0, 0x4);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x12, 0x2740);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 0x0);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x2, 0x2010);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 0xcd1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 5, 0, 0x4);
 
-	rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x12, 7, 6, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2a), 0x12, 7, 6, 0x1);
 	rtpcs_931x_sds_fiber_disable(ctrl, sds);
 
 	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, spd_ori);
@@ -3219,57 +3230,57 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 		/* from _dal_mango_construct_init_10gr */
 		// rtpcs_sds_write_bits(ctrl, sds, 0x1f, 0xb, 1, 1, 1);
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x7, 15, 15, 0x1);
-		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2a), 0x7, 15, 15, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x3);
 
 		// phy_rtl9310_10g_tx
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x2e, 0xf, 5, 0, 0x2);
-		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0xd, 6, 6, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xf, 5, 0, 0x2);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0xd, 6, 6, 0x1);
 
 		rtpcs_931x_sds_set_mode(ctrl, sds, mode);
 		/* from _phy_rtl9310_10gMedia_set */
-		rtpcs_sds_write(ctrl, sds, 0x2e, 0x12, 0x27c0);
-		rtpcs_sds_write(ctrl, sds, 0x2f, 0x0, 0xc000);
-		rtpcs_sds_write(ctrl, sds, 0x2f, 0x2, 0x6010);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x12, 0x27c0);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x0, 0xc000);
+		rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2f), 0x2, 0x6010);
 		break;
 
 	case RTPCS_SDS_MODE_2500BASEX:
-		rtpcs_sds_write_bits(ctrl, sds, 0x41, 0x14, 8, 8, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 0x14, 8, 8, 0x1);
 		break;
 
 	case RTPCS_SDS_MODE_1000BASEX:
-		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x7, 15, 15, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2a), 0x7, 15, 15, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x3);
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x6, 0xd, 6, 6, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x6), 0xd, 6, 6, 0x1);
 
 		rtpcs_931x_sds_set_mode(ctrl, sds, mode);
 
 		/* from _dal_mango_construct_init_fiber1g */
-		rtpcs_sds_write_bits(ctrl, sds, 0x43, 0x13, 15, 14, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x3), 0x13, 15, 14, 0x0);
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 12, 12, 0x1);
-		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 6, 6, 0x1);
-		rtpcs_sds_write_bits(ctrl, sds, 0x42, 0x0, 13, 13, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x2), 0x0, 12, 12, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x2), 0x0, 6, 6, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x2), 0x0, 13, 13, 0x0);
 
-		rtpcs_sds_write_bits(ctrl, sds, 0x40, 0x4, 2, 2, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x0), 0x4, 2, 2, 0x1);
 
 		/* gating of ? */
-		rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1f), 0x1, 0, 0, 0x0);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	rtpcs_sds_write(ctrl, sds, 0x20, 0x0, 0xc30);
-	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 9, 0, 0x30);
-	rtpcs_sds_write_bits(ctrl, sds, 0x2a, 0x12, 7, 6, 0x3);
+	rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 0xc30);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 9, 0, 0x30);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2a), 0x12, 7, 6, 0x3);
 
-	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x1);
-	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x3);
 
 	regmap_write_bits(ctrl->map, RTL931X_ISR_SERDES_RXIDLE, BIT(sds - 2), BIT(sds - 2));
 	rtpcs_931x_sds_reset(ctrl, sds);
@@ -3368,82 +3379,82 @@ static int rtpcs_931x_sds_init(struct rtpcs_ctrl *ctrl, int sds, int chiptype)
 
 		switch(sds) {
 		case 2:
-			rtpcs_sds_write_bits(ctrl, 2, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 2, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 2, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 2, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 2, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 2, 0x29, 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 2, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
 			break;
 		case 6:
-			rtpcs_sds_write_bits(ctrl, 6, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x2f, 0x5, 15, 0, 0x3FD7);
-			rtpcs_sds_write_bits(ctrl, 6, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x2d, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 6, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x2b, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 6, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x25, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 6, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x27, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 6, 0x29, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 6, 0x29, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2f), 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2d), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x2b), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x25), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x27), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 6, RTPCS_931X_ASDS_PAGE(0x29), 0x5, 15, 0, 0x27D7);
 			break;
 		case 10:
-			rtpcs_sds_write_bits(ctrl, 10, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x2f, 0x5, 15, 0, 0x3FD7);
-			rtpcs_sds_write_bits(ctrl, 10, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x2d, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 10, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x2b, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 10, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x25, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 10, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x27, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 10, 0x29, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 10, 0x29, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2f), 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2d), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x2b), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x25), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x27), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 10, RTPCS_931X_ASDS_PAGE(0x29), 0x5, 15, 0, 0x27D7);
 			break;
 		case 14:
-			rtpcs_sds_write_bits(ctrl, 14, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x2f, 0x5, 15, 0, 0x3FD7);
-			rtpcs_sds_write_bits(ctrl, 14, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x2d, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 14, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x2b, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 14, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x25, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 14, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x27, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 14, 0x29, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 14, 0x29, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2f), 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2d), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x2b), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x25), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x27), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 14, RTPCS_931X_ASDS_PAGE(0x29), 0x5, 15, 0, 0x27D7);
 			break;
 		case 18:
-			rtpcs_sds_write_bits(ctrl, 18, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x2f, 0x5, 15, 0, 0x3FD7);
-			rtpcs_sds_write_bits(ctrl, 18, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x2d, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 18, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x2b, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 18, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x25, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 18, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x27, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 18, 0x29, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 18, 0x29, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2f), 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2d), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x2b), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x25), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x27), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 18, RTPCS_931X_ASDS_PAGE(0x29), 0x5, 15, 0, 0x27D7);
 			break;
 		case 22:
-			rtpcs_sds_write_bits(ctrl, 22, 0x2f, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x2f, 0x5, 15, 0, 0x3FD7);
-			rtpcs_sds_write_bits(ctrl, 22, 0x2d, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x2d, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 22, 0x2b, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x2b, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 22, 0x25, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x25, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 22, 0x27, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x27, 0x5, 15, 0, 0x27D7);
-			rtpcs_sds_write_bits(ctrl, 22, 0x29, 0x6, 15, 0, 0x5826);
-			rtpcs_sds_write_bits(ctrl, 22, 0x29, 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2f), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2f), 0x5, 15, 0, 0x3FD7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2d), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2d), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2b), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x2b), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x25), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x25), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x27), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x27), 0x5, 15, 0, 0x27D7);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x29), 0x6, 15, 0, 0x5826);
+			rtpcs_sds_write_bits(ctrl, 22, RTPCS_931X_ASDS_PAGE(0x29), 0x5, 15, 0, 0x27D7);
 			break;
 		default:
 			break;
@@ -3496,20 +3507,20 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 	even_sds = sds & ~1;
 
 	pr_info("%s: set sds %d to mode %d\n", __func__, sds, mode);
-	val = rtpcs_sds_read_bits(ctrl, sds, 0x1F, 0x9, 11, 6);
+	val = rtpcs_sds_read_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x1f), 0x9, 11, 6);
 
 	pr_info("%s: fibermode %08X stored mode 0x%x", __func__,
-			rtpcs_sds_read(ctrl, sds, 0x1f, 0x9), val);
+			rtpcs_sds_read(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x1f), 0x9), val);
 	pr_info("%s: SGMII mode %08X in 0x24 0x9", __func__,
-			rtpcs_sds_read(ctrl, sds, 0x24, 0x9));
+			rtpcs_sds_read(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x24), 0x9));
 	pr_info("%s: CMU mode %08X stored even SDS %d", __func__,
-			rtpcs_sds_read(ctrl, sds & ~1, 0x20, 0x12), sds & ~1);
+			rtpcs_sds_read(ctrl, sds & ~1, RTPCS_931X_ASDS_PAGE(0x20), 0x12), sds & ~1);
 	pr_info("%s: serdes_mode_ctrl %08X", __func__,  RTL931X_SERDES_MODE_CTRL + 4 * (sds >> 2));
-	pr_info("%s CMU page 0x24 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, 0x24, 0x7));
-	pr_info("%s CMU page 0x26 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, 0x26, 0x7));
-	pr_info("%s CMU page 0x28 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, 0x28, 0x7));
-	pr_info("%s XSG page 0x0 0xe %08x\n", __func__, rtpcs_sds_read(ctrl, sds, 0x40, 0xe));
-	pr_info("%s XSG2 page 0x0 0xe %08x\n", __func__, rtpcs_sds_read(ctrl, sds, 0x80, 0xe));
+	pr_info("%s CMU page 0x24 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x24), 0x7));
+	pr_info("%s CMU page 0x26 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x26), 0x7));
+	pr_info("%s CMU page 0x28 0x7 %08x\n", __func__, rtpcs_sds_read(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x28), 0x7));
+	pr_info("%s XSG page 0x0 0xe %08x\n", __func__, rtpcs_sds_read(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x0), 0xe));
+	pr_info("%s XSG2 page 0x0 0xe %08x\n", __func__, rtpcs_sds_read(ctrl, sds, RTPCS_931X_XSGMSDS1_PAGE(0x0), 0xe));
 
 	regmap_read(ctrl->map, RTL93XX_MODEL_NAME_INFO, &model_info);
 	if ((model_info >> 4) & 0x1) {
@@ -3520,7 +3531,7 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 	}
 
 	pr_info("%s: 2.5gbit %08X", __func__,
-	        rtpcs_sds_read(ctrl, sds, 0x41, 0x14));
+	        rtpcs_sds_read(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1), 0x14));
 	rtpcs_931x_sds_init(ctrl, sds, chiptype);
 
 	// Begin _dal_mango_construct_sdsMode_set
@@ -3561,9 +3572,9 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 		link->sds_mode = RTPCS_SDS_MODE_SGMII;
 
 		/* gating of ? */
-		rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x1);
-		rtpcs_sds_write_bits(ctrl, sds, 0x24, 0x9, 15, 15, 0x0);
-		rtpcs_sds_write_bits(ctrl, sds, 0x5f, 0x1, 0, 0, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1f), 0x1, 0, 0, 0x1);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x24), 0x9, 15, 15, 0x0);
+		rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_XSGMSDS_PAGE(0x1f), 0x1, 0, 0, 0x0);
 
 		rtpcs_931x_sds_set_cmu_band(ctrl, sds, true, 62,
 					    link->sds_mode);
@@ -3581,16 +3592,16 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 
 	if (sds >= 2 && sds <= 13) {
 		if (chiptype)
-			rtpcs_sds_write(ctrl, sds, 0x2E, 0x1, board_sds_tx_type1[sds - 2]);
+			rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1, board_sds_tx_type1[sds - 2]);
 		else {
 			val = 0xa0000;
 			regmap_write(ctrl->map, RTL93XX_CHIP_INFO, val);
 			regmap_read(ctrl->map, RTL93XX_CHIP_INFO, &val);
 			if (val & BIT(28)) /* consider 9311 etc. RTL9313_CHIP_ID == HWP_CHIP_ID(unit)) */
 			{
-				rtpcs_sds_write(ctrl, sds, 0x2E, 0x1, board_sds_tx2[sds - 2]);
+				rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x1, board_sds_tx2[sds - 2]);
 			} else {
-				rtpcs_sds_write(ctrl, sds, 0x2E, 0x1, board_sds_tx[sds - 2]);
+				rtpcs_sds_write(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x2E), 0x1, board_sds_tx[sds - 2]);
 			}
 			val = 0;
 			regmap_write(ctrl->map, RTL93XX_CHIP_INFO, val);
@@ -3608,8 +3619,8 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 
 	// end: _dal_mango_construct_sdsMode_set
 	mdelay(10);
-	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x1);
-	rtpcs_sds_write_bits(ctrl, sds, 0x20, 0x0, 11, 10, 0x3);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x1);
+	rtpcs_sds_write_bits(ctrl, sds, RTPCS_931X_ASDS_PAGE(0x20), 0x0, 11, 10, 0x3);
 	mdelay(1000);
 
 	// TODO: auto rx-calibration
@@ -3884,7 +3895,7 @@ static int rtpcs_probe(struct platform_device *pdev)
 		return PTR_ERR(ctrl->map);
 
 	if (ctrl->cfg->reg_fields) {
-		#if 1
+		#if 0
 		// ctrl->rm_fields = devm_kzalloc(dev, ctrl->cfg->num_reg_fields * sizeof(struct regmap_field *), GFP_KERNEL);
 		pr_err("[hh CC] %s: ctrl->rm_fields: %px\n", __func__, ctrl->rm_fields);
 		for (int i = 0; i < ctrl->cfg->num_reg_fields; i++) {
@@ -3894,15 +3905,15 @@ static int rtpcs_probe(struct platform_device *pdev)
 			pr_err("[hh CC] %s: ctrl->rm_fields[i:%d]: %px\n", __func__, i, ctrl->rm_fields[i]);
 		}
 		#else
+		ctrl->rm_fields = devm_kzalloc(dev, ctrl->cfg->num_reg_fields * sizeof(struct regmap_field *), GFP_KERNEL);
+		if (!ctrl->rm_fields)
+			return -ENOMEM;
 		if (devm_regmap_field_bulk_alloc(dev,
 						 ctrl->map,
 						 ctrl->rm_fields,
 						 ctrl->cfg->reg_fields,
 						 ctrl->cfg->num_reg_fields)) {
 			return -ENOMEM;
-		}
-		for (int i = 0; i < ctrl->cfg->num_reg_fields; i++) {
-			pr_err("[hh CC] %s: ctrl->rm_fields[i:%d]: %px\n", __func__, i, ctrl->rm_fields[i]);
 		}
 		#endif
 
