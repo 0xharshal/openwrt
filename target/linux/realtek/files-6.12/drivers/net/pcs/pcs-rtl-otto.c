@@ -2522,6 +2522,7 @@ static struct rtpcs_link_sts rtpcs_931x_sds_link_sts_get(struct rtpcs_ctrl *ctrl
 	return link_sts;
 }
 
+__attribute__((unused))
 static int rtpcs_931x_sds_set_polarity(struct rtpcs_ctrl *ctrl, u32 sds,
 				       bool tx_inv, bool rx_inv)
 {
@@ -3018,6 +3019,7 @@ static int rtpcs_931x_sds_fiber_adapt(struct rtpcs_link *link)
 static void rtpcs_931x_sds_rxcali(struct rtpcs_link *link)
 {
 	u32 ori_off_mode;
+	int ret;
 	mdelay(50);
 	// drv_port_txEnable_set
 	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_TX_EN], link->port, 0);
@@ -3029,11 +3031,17 @@ static void rtpcs_931x_sds_rxcali(struct rtpcs_link *link)
 	// TODO _phy_rtl9310_leq_adapt
 	// else if serdes port
 	if (link->sds_mode == RTPCS_SDS_MODE_10GBASER) {
-		rtpcs_sds_write_bits(link->ctrl, link->sds, 0x2e, 0xe, 13, 11, 1);
-		rtpcs_931x_sds_fiber_adapt(link);
+		rtpcs_sds_write_bits(link->ctrl, link->sds, RTPCS_931X_ASDS_PAGE(0x2e), 0xe, 13, 11, 1);
+		ret = rtpcs_931x_sds_fiber_adapt(link);
+		if (ret)
+			goto error;
 	}
 
 	link->is_rx_calibrated = true;
+
+error:
+	if (ret)
+		rtpcs_931x_phy_sds_init(link);
 	regmap_write(link->ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, ori_off_mode);
 	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_TX_EN], link->port, 1);
 	regmap_fields_write(link->ctrl->rm_fields[RTL931X_MAC_L2_PORT_RX_EN], link->port, 1);
@@ -3100,7 +3108,6 @@ static int rtpcs_931x_sds_fiber_rx_check(struct rtpcs_link *link)
 
 	if (!link->is_rx_calibrated) {
 		rtpcs_931x_sds_linkup_process(link);
-
 	}
 
 	if (link->is_rx_calibrated) {
@@ -3179,13 +3186,9 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 	// u32 analog_sds = rtpcs_931x_get_analog_sds(sds);
 
 	/* from _phy_rtl9310_10gMedia_set */
-	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: calling fib_unidir_set\n");
 	unidir_sts = rtpcs_931x_port_fib_unidir_set(ctrl, port, 0);
 
-	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: before port_mac_force_link_set\n");
 	rtpcs_931x_port_mac_force_link_set(ctrl, port, true, false);
-	// (void)rtpcs_931x_port_mac_force_link_set;
-	pr_err("[hh CC] rtpcs_931x_sds_config_fiber: after port_mac_force_link_set\n");
 	// ignore return value, this part is not crucial
 	rtpcs_931x_link_down_chk(ctrl, port);
 	regmap_fields_read(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, &spd_ori);
@@ -3217,13 +3220,10 @@ static int rtpcs_931x_sds_config_fiber(struct rtpcs_ctrl *ctrl, int sds,
 
 	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_SPD_SEL], port, spd_ori);
 	regmap_fields_write(ctrl->rm_fields[RTL931X_SMI_FORCE_SPD_EN], port, spd_en_ori);
-	pr_err("[hh CC] %s: %d I reach here.\n", __func__, __LINE__);
-	#if 1
+
 	rtpcs_931x_port_fib_unidir_set(ctrl, port, !!(unidir_sts & BIT_ULL(port)));
-	#else
-	rtpcs_931x_port_fib_unidir_set(ctrl, port, unidir_sts);
-	#endif
-	rtpcs_sds_write(ctrl, even_sds, 0x2e, 0x8, 0x294);
+
+	rtpcs_sds_write(ctrl, even_sds, RTPCS_931X_ASDS_PAGE(0x2e), 0x8, 0x294);
 
 	switch (mode) {
 	case RTPCS_SDS_MODE_10GBASER:
@@ -3610,11 +3610,13 @@ static int rtpcs_931x_setup_pcs_serdes(struct phylink_pcs *pcs, int sds, int por
 
 	val = ori & ~(1 << sds);
 	regmap_write(ctrl->map, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR, val);
-	/* TODO: This does not belong here.
-	rtpcs_931x_sds_set_polarity(ctrl, sds, ctrl->tx_pol_inv[sds],
-				    ctrl->rx_pol_inv[sds]);
-					*/
-	(void)rtpcs_931x_sds_set_polarity;
+	/**
+	 * TODO: This does not belong here..
+	 * Where does this come from?
+	 * */
+	// rtpcs_931x_sds_set_polarity(ctrl, sds, ctrl->tx_pol_inv[sds],
+				//    ctrl->rx_pol_inv[sds]);
+
 	rtpcs_931x_sds_set_mode(ctrl, sds, link->sds_mode);
 
 	// end: _dal_mango_construct_sdsMode_set
@@ -3644,7 +3646,6 @@ static void rtpcs_pcs_get_state(struct phylink_pcs *pcs, struct phylink_link_sta
 	struct rtpcs_ctrl *ctrl = link->ctrl;
 	int port = link->port;
 	int linkup, speed;
-
 
 	state->link = 0;
 	state->speed = SPEED_UNKNOWN;
@@ -3717,7 +3718,6 @@ static int rtpcs_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
 	struct rtpcs_link *link = rtpcs_phylink_pcs_to_link(pcs);
 	struct rtpcs_ctrl *ctrl = link->ctrl;
 	int ret = 0;
-	// int err = 0;
 
 	if (link->sds < 0)
 		return 0;
@@ -3737,7 +3737,6 @@ static int rtpcs_pcs_config(struct phylink_pcs *pcs, unsigned int neg_mode,
 		ret = ctrl->cfg->setup_serdes(ctrl, link->sds, interface);
 		if (ret < 0)
 			goto out;
-	// }
 	} else if (ctrl->cfg->setup_pcs_serdes) {
 		ret = ctrl->cfg->setup_pcs_serdes(pcs, link->sds, link->port, interface);
 		if (ret < 0)
@@ -3763,8 +3762,6 @@ struct phylink_pcs *rtpcs_create(struct device *dev, struct device_node *np, int
 	struct device_node *pcs_np;
 	struct rtpcs_ctrl *ctrl;
 	struct rtpcs_link *link;
-	// char queue_name[256] = "";
-	// int err;
 	int sds;
 
 	/*
@@ -3803,8 +3800,6 @@ struct phylink_pcs *rtpcs_create(struct device *dev, struct device_node *np, int
 		put_device(&pdev->dev);
 		return ERR_PTR(-EPROBE_DEFER);
 	}
-
-	// snprintf(queue_name, sizeof(queue_name), "pcs-rtl-otto");
 
 	if (port < 0 || port > ctrl->cfg->cpu_port)
 		return ERR_PTR(-EINVAL);
